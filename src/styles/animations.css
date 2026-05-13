@@ -1,0 +1,30 @@
+/* Subtle transitions for hover effects */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Exempt some elements from transition or define specific ones */
+.no-transition * {
+  transition: none !important;
+}
+
+/* Context Menu / Modals */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 120ms ease-out forwards;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in {
+  animation: slideIn 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import './themes.css';
+@import './animations.css';
+
+@layer base {
+  html, body {
+    @apply h-full overflow-hidden;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  
+  #root {
+    @apply h-full;
+  }
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-primary); 
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar); 
+    border: 2px solid var(--bg-primary);
+    border-radius: 5px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted); 
+  }
+}
+
+/* User Selection */
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}

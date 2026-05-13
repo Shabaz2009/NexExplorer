@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NexExplorer",
+  "version": "1.0.0",
+  "identifier": "com.nexexplorer.filemanager",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "NexExplorer",
+        "width": 1024,
+        "height": 768,
+        "decorations": false,
+        "transparent": true,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "copyright": "Copyright © 2024 NexExplorer",
+    "category": "Utility",
+    "shortDescription": "Professional file manager for Windows",
+    "longDescription": "NexExplorer is a modern, professional-grade file manager featuring tabbed browsing, dual-pane view, archive management via 7-Zip, and local network file sharing.",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "headerImage": null,
+        "sidebarImage": null
+      }
+    }
+  }
+}
