@@ -39,8 +39,9 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: NexExplorer-Windows-Installer
+          name: NexExplorer-Windows-Binaries
           path: |
+            src-tauri/target/release/nexexplorer.exe
             src-tauri/target/release/bundle/**/*.exe
             src-tauri/target/release/bundle/**/*.msi
           if-no-files-found: error
