@@ -1,9 +1,9 @@
+@import './themes.css';
+@import './animations.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import './themes.css';
-@import './animations.css';
 
 @layer base {
   html, body {
