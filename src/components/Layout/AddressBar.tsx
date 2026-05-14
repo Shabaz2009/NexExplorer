@@ -21,17 +21,17 @@ const AddressBar: React.FC = () => {
     }
   };
 
-  // Basic path parsing for breadcrumbs (Windows style)
   const segments = currentPath.split('\\').filter(Boolean);
   
   const navigateToSegment = (index: number) => {
-    const newPath = segments.slice(0, index + 1).join('\\') + '\\';
+    const isDrive = index === 0 && segments[0].endsWith(':');
+    const newPath = segments.slice(0, index + 1).join('\\') + (isDrive ? '\\' : '');
     setCurrentPath(newPath);
   };
 
   return (
     <div 
-      className="flex-1 flex items-center h-7 bg-bg-secondary border border-border rounded hover:border-text-muted transition-colors cursor-text group overflow-hidden"
+      className="flex-1 flex items-center h-8 bg-bg-primary/40 backdrop-blur-sm border border-border/50 rounded-lg hover:border-accent/40 transition-all cursor-text group overflow-hidden shadow-inner"
       onClick={() => {
         if (!isEditing) setIsEditing(true);
       }}
@@ -39,31 +39,33 @@ const AddressBar: React.FC = () => {
       {isEditing ? (
         <input 
           autoFocus
-          className="w-full h-full bg-transparent outline-none px-2 text-sm text-text-primary"
+          className="w-full h-full bg-transparent outline-none px-3 text-[13px] text-text-primary font-medium"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={() => setIsEditing(false)}
         />
       ) : (
-        <div className="flex items-center text-sm px-2 w-full overflow-hidden">
-          {segments.map((segment, index) => (
-            <React.Fragment key={index}>
-              <span 
-                className="hover:bg-bg-hover px-1 rounded cursor-pointer truncate max-w-[150px]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigateToSegment(index);
-                }}
-              >
-                {segment}
-              </span>
-              {index < segments.length - 1 && (
-                <ChevronRight size={14} className="text-text-muted mx-0.5 flex-shrink-0" />
-              )}
-            </React.Fragment>
-          ))}
-          {segments.length === 0 && <span className="text-text-muted">This PC</span>}
+        <div className="flex items-center text-[13px] font-medium px-2 w-full overflow-hidden">
+          <div className="flex items-center gap-0.5">
+            {segments.map((segment, index) => (
+              <React.Fragment key={index}>
+                <button 
+                  className="px-2 py-1 rounded-md hover:bg-white/10 interactive truncate max-w-[200px] text-text-secondary hover:text-text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateToSegment(index);
+                  }}
+                >
+                  {segment}
+                </button>
+                {index < segments.length - 1 && (
+                  <ChevronRight size={14} className="text-text-muted/50 mx-0.5 flex-shrink-0" />
+                )}
+              </React.Fragment>
+            ))}
+            {segments.length === 0 && <span className="text-text-muted px-2">System Root</span>}
+          </div>
         </div>
       )}
     </div>

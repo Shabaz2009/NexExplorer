@@ -10,8 +10,9 @@
     @apply h-full overflow-hidden;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-size: 13px;
-    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    font-size: 14px;
+    font-family: 'Inter', -apple-system, "Segoe UI", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
   
   #root {
@@ -20,24 +21,42 @@
 
   /* Scrollbar Styling */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: var(--bg-primary); 
+    background: transparent; 
   }
   ::-webkit-scrollbar-thumb {
     background: var(--scrollbar); 
-    border: 2px solid var(--bg-primary);
-    border-radius: 5px;
+    border-radius: 10px;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted); 
   }
 }
 
+@layer components {
+  .glass {
+    @apply backdrop-blur-md bg-opacity-70;
+    background-color: var(--bg-glass);
+    border-color: var(--border-color);
+  }
+  
+  .glass-card {
+    @apply backdrop-blur-sm border bg-opacity-40;
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .interactive {
+    @apply transition-all duration-200 ease-out;
+  }
+}
+
 /* User Selection */
 ::selection {
-  background: var(--accent);
-  color: var(--accent-text);
+  background: var(--accent-glow);
+  color: var(--text-primary);
 }

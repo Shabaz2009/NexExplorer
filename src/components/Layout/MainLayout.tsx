@@ -26,34 +26,58 @@ const MainLayout: React.FC = () => {
   }, [activeTabId, tabs, setCurrentPath, setViewMode]);
 
   return (
-    <div className="flex flex-col h-screen bg-bg-primary text-text-primary overflow-hidden">
-      <TitleBar />
-      <TabBar />
-      <Toolbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 flex flex-col min-w-0 bg-bg-secondary">
-          {/* Action Bar (New, Cut, Copy, etc) */}
-          <div className="h-10 flex items-center px-4 border-b border-border bg-bg-primary gap-2 text-sm">
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">New ▾</button>
-            <div className="w-px h-4 bg-border mx-1"></div>
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">Cut</button>
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">Copy</button>
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">Paste</button>
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">Rename</button>
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">Delete</button>
-            <div className="w-px h-4 bg-border mx-1"></div>
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">View ▾</button>
-            <button className="px-2 py-1 rounded hover:bg-bg-hover">Sort ▾</button>
+    <div className="flex flex-col h-screen bg-bg-primary text-text-primary overflow-hidden font-sans select-none">
+      {/* Title Bar - Draggable */}
+      <div className="glass border-b border-border z-50">
+        <TitleBar />
+        <TabBar />
+        <Toolbar />
+      </div>
+
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar - Glass Effect */}
+        <div className="w-64 border-r border-border glass bg-opacity-30 flex-shrink-0 hidden md:block">
+          <Sidebar />
+        </div>
+
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col min-w-0 bg-bg-secondary relative shadow-inner">
+          {/* Subtle top shadow for depth */}
+          <div className="absolute inset-x-0 top-0 h-8 pointer-events-none bg-gradient-to-b from-black/10 to-transparent z-10" />
+          
+          {/* Quick Action Bar */}
+          <div className="h-12 flex items-center px-6 border-b border-border bg-bg-tertiary/50 backdrop-blur-sm gap-4 text-xs font-medium z-20">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-bg-hover interactive active:scale-95">
+              <span className="text-accent text-lg">+</span> New
+            </button>
+            <div className="w-px h-5 bg-border"></div>
+            <div className="flex items-center gap-1">
+              <button className="px-3 py-1.5 rounded-md hover:bg-bg-hover interactive active:scale-95 text-text-secondary hover:text-text-primary">Cut</button>
+              <button className="px-3 py-1.5 rounded-md hover:bg-bg-hover interactive active:scale-95 text-text-secondary hover:text-text-primary">Copy</button>
+              <button className="px-3 py-1.5 rounded-md hover:bg-bg-hover interactive active:scale-95 text-text-secondary hover:text-text-primary">Paste</button>
+            </div>
+            <div className="w-px h-5 bg-border"></div>
+            <button className="px-3 py-1.5 rounded-md hover:bg-bg-hover interactive active:scale-95 text-text-secondary hover:text-text-primary">Rename</button>
+            <button className="px-3 py-1.5 rounded-md hover:bg-bg-hover interactive active:scale-95 text-error/80 hover:text-error">Delete</button>
+            
+            <div className="ml-auto flex items-center gap-2">
+              <button className="px-3 py-1.5 rounded-md hover:bg-bg-hover interactive text-text-secondary">View ▾</button>
+              <button className="px-3 py-1.5 rounded-md hover:bg-bg-hover interactive text-text-secondary">Sort ▾</button>
+            </div>
           </div>
           
-          {/* Main Content Area */}
-          <div className="flex-1 overflow-auto relative">
-            <ExplorerView />
+          {/* Main Content Scroll Area */}
+          <div className="flex-1 overflow-auto relative p-1">
+            <div className="min-h-full">
+              <ExplorerView />
+            </div>
           </div>
         </main>
       </div>
-      <StatusBar />
+
+      <div className="z-50 border-t border-border bg-bg-primary/95 backdrop-blur-md">
+        <StatusBar />
+      </div>
     </div>
   );
 };
