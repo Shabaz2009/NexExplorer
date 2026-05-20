@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { downloadDir } from '@tauri-apps/api/path';
 import { Wifi, Send, Smartphone, Monitor, Laptop, Tablet, RefreshCw, Shield, Globe, CheckCircle2, Server, FolderInput, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
@@ -55,12 +56,24 @@ const LocalSharePanel: React.FC = () => {
   const [transfers, setTransfers] = useState<TransferProgress[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [showQR, setShowQR] = useState(false);
-  const [defaultUsbPath, setDefaultUsbPath] = useState<string>('C:\\Users\\User\\Downloads'); // Can be expanded to use Tauri path API
+  const [defaultUsbPath, setDefaultUsbPath] = useState<string>('');
 
   const { trustedDevices, addTrustedDevice } = useLocalShareStore();
   const { navigateTo } = useExplorerStore();
 
   useEffect(() => {
+    // Load default path
+    const loadPath = async () => {
+      try {
+        const path = await downloadDir();
+        setDefaultUsbPath(path);
+      } catch (e) {
+        console.error('Failed to get download dir:', e);
+        setDefaultUsbPath('Downloads');
+      }
+    };
+    loadPath();
+
     // Auto-scan on mount
     startScanning();
 

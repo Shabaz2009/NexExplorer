@@ -3,6 +3,7 @@ import { Home, Download, FileText, Image, Music, Video, Star, Wifi, Settings, Sh
 import { useExplorerStore } from '../../store/explorerStore';
 import { motion } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
+import { desktopDir, downloadDir, documentDir, pictureDir, audioDir, videoDir } from '@tauri-apps/api/path';
 import SidebarTreeItem from './SidebarTreeItem';
 
 interface DriveInfo {
@@ -12,9 +13,17 @@ interface DriveInfo {
   drive_type: string;
 }
 
+interface NavItem {
+  name: string;
+  path: string;
+  icon: any;
+  color: string;
+}
+
 const Sidebar: React.FC = () => {
   const { currentPath, navigateTo } = useExplorerStore();
   const [drives, setDrives] = useState<DriveInfo[]>([]);
+  const [navItems, setNavItems] = useState<NavItem[]>([]);
   
   const isActive = (pathSnippet: string) => currentPath.toLowerCase().includes(pathSnippet.toLowerCase());
 
@@ -27,17 +36,25 @@ const Sidebar: React.FC = () => {
         console.error('Failed to load drives:', err);
       }
     };
+    
+    const loadPaths = async () => {
+      try {
+        setNavItems([
+          { name: 'Desktop', path: await desktopDir(), icon: Home, color: 'text-accent' },
+          { name: 'Downloads', path: await downloadDir(), icon: Download, color: 'text-sky-500' },
+          { name: 'Documents', path: await documentDir(), icon: FileText, color: 'text-indigo-500' },
+          { name: 'Pictures', path: await pictureDir(), icon: Image, color: 'text-emerald-500' },
+          { name: 'Music', path: await audioDir(), icon: Music, color: 'text-violet-500' },
+          { name: 'Videos', path: await videoDir(), icon: Video, color: 'text-rose-500' },
+        ]);
+      } catch (err) {
+        console.error('Failed to load system paths:', err);
+      }
+    };
+    
     loadDrives();
+    loadPaths();
   }, []);
-
-  const navItems = [
-    { name: 'Desktop', path: 'C:\\Users\\User\\Desktop', icon: Home, color: 'text-accent' },
-    { name: 'Downloads', path: 'C:\\Users\\User\\Downloads', icon: Download, color: 'text-sky-500' },
-    { name: 'Documents', path: 'C:\\Users\\User\\Documents', icon: FileText, color: 'text-indigo-500' },
-    { name: 'Pictures', path: 'C:\\Users\\User\\Pictures', icon: Image, color: 'text-emerald-500' },
-    { name: 'Music', path: 'C:\\Users\\User\\Music', icon: Music, color: 'text-violet-500' },
-    { name: 'Videos', path: 'C:\\Users\\User\\Videos', icon: Video, color: 'text-rose-500' },
-  ];
 
   return (
     <div className="h-full flex flex-col glass border-r border-border/50">
