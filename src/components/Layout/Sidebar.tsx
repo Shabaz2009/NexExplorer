@@ -1,12 +1,34 @@
-import React from 'react';
-import { HardDrive, Home, Download, FileText, Image, Music, Video, Star, Box, Wifi, Compass, Layers, Settings, Shield } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Home, Download, FileText, Image, Music, Video, Star, Wifi, Settings, Shield, Monitor } from 'lucide-react';
 import { useExplorerStore } from '../../store/explorerStore';
 import { motion } from 'framer-motion';
+import { invoke } from '@tauri-apps/api/core';
+import SidebarTreeItem from './SidebarTreeItem';
+
+interface DriveInfo {
+  letter: string;
+  path: string;
+  label: string;
+  drive_type: string;
+}
 
 const Sidebar: React.FC = () => {
-  const { currentPath, setCurrentPath } = useExplorerStore();
+  const { currentPath, navigateTo } = useExplorerStore();
+  const [drives, setDrives] = useState<DriveInfo[]>([]);
   
   const isActive = (pathSnippet: string) => currentPath.toLowerCase().includes(pathSnippet.toLowerCase());
+
+  useEffect(() => {
+    const loadDrives = async () => {
+      try {
+        const driveList = await invoke<DriveInfo[]>('get_drives');
+        setDrives(driveList);
+      } catch (err) {
+        console.error('Failed to load drives:', err);
+      }
+    };
+    loadDrives();
+  }, []);
 
   const navItems = [
     { name: 'Desktop', path: 'C:\\Users\\User\\Desktop', icon: Home, color: 'text-accent' },
@@ -22,12 +44,12 @@ const Sidebar: React.FC = () => {
       {/* Branded Header */}
       <div className="p-6 pb-2">
         <div className="flex items-center gap-3 mb-8 group cursor-default">
-          <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shadow-lg shadow-accent/40 group-hover:scale-110 interactive">
-            <Compass className="text-white" size={24} strokeWidth={2.5} />
+          <div className="w-11 h-11 rounded-2xl overflow-hidden shadow-xl shadow-accent/20 group-hover:scale-105 interactive border border-white/10 bg-bg-tertiary">
+            <img src="/logo.png" alt="NexExplorer" className="w-full h-full object-cover" />
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-tight text-text-primary">NexExplorer</h1>
-            <p className="text-[10px] text-text-muted font-medium uppercase tracking-[0.2em]">Production</p>
+            <p className="text-[10px] text-accent font-bold uppercase tracking-[0.2em] opacity-80">v1.0.0</p>
           </div>
         </div>
       </div>
@@ -36,7 +58,7 @@ const Sidebar: React.FC = () => {
         {/* Quick Access */}
         <section>
           <div className="px-3 mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Library</span>
+            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Favorites</span>
             <Star size={10} className="text-text-muted opacity-50" />
           </div>
           <div className="space-y-1">
@@ -45,7 +67,7 @@ const Sidebar: React.FC = () => {
                 key={item.name}
                 whileHover={{ x: 4 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setCurrentPath(item.path)}
+                onClick={() => navigateTo(item.path)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium interactive ${
                   isActive(item.name.toLowerCase()) 
                     ? 'bg-accent/15 text-text-primary border border-accent/20' 
@@ -62,39 +84,20 @@ const Sidebar: React.FC = () => {
           </div>
         </section>
 
-        {/* This PC / Drives */}
+        {/* This PC / Tree View */}
         <section>
           <div className="px-3 mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">System</span>
-            <Layers size={10} className="text-text-muted opacity-50" />
+            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">This PC</span>
+            <Monitor size={10} className="text-text-muted opacity-50" />
           </div>
-          <div className="space-y-2">
-            {[
-              { name: 'Windows (C:)', path: 'C:\\', usage: '75%' },
-              { name: 'Data (D:)', path: 'D:\\', usage: '25%' }
-            ].map((drive) => (
-              <motion.button 
-                key={drive.name}
-                whileHover={{ x: 4 }}
-                onClick={() => setCurrentPath(drive.path)}
-                className={`w-full flex flex-col p-3 rounded-xl text-left interactive ${
-                  currentPath === drive.path 
-                    ? 'bg-bg-tertiary border border-border-strong text-text-primary' 
-                    : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <HardDrive size={16} className={currentPath === drive.path ? 'text-accent' : 'text-text-muted'} />
-                  <span className="text-[13px] font-medium">{drive.name}</span>
-                </div>
-                <div className="w-full h-1.5 bg-bg-primary rounded-full overflow-hidden border border-border/20">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: drive.usage }}
-                    className="h-full bg-accent shadow-[0_0_8px_rgba(99,102,241,0.5)]" 
-                  />
-                </div>
-              </motion.button>
+          <div className="space-y-0.5">
+            {drives.map((drive) => (
+              <SidebarTreeItem 
+                key={drive.path}
+                name={drive.label || `Local Disk (${drive.letter}:)`}
+                path={drive.path}
+                isDrive={true}
+              />
             ))}
           </div>
         </section>
@@ -106,7 +109,7 @@ const Sidebar: React.FC = () => {
           </div>
           <motion.button 
             whileHover={{ scale: 1.02 }}
-            onClick={() => setCurrentPath('localshare://')}
+            onClick={() => navigateTo('localshare://')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-[13px] font-semibold interactive ${
               currentPath === 'localshare://' 
                 ? 'bg-accent text-white shadow-xl shadow-accent/30' 

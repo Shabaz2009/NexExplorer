@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { useExplorerStore } from '../../store/explorerStore';
 
 const AddressBar: React.FC = () => {
-  const { currentPath, setCurrentPath } = useExplorerStore();
+  const { currentPath, navigateTo } = useExplorerStore();
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(currentPath);
 
@@ -13,7 +13,7 @@ const AddressBar: React.FC = () => {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      setCurrentPath(inputValue);
+      navigateTo(inputValue);
       setIsEditing(false);
     } else if (e.key === 'Escape') {
       setInputValue(currentPath);
@@ -26,7 +26,7 @@ const AddressBar: React.FC = () => {
   const navigateToSegment = (index: number) => {
     const isDrive = index === 0 && segments[0].endsWith(':');
     const newPath = segments.slice(0, index + 1).join('\\') + (isDrive ? '\\' : '');
-    setCurrentPath(newPath);
+    navigateTo(newPath);
   };
 
   return (
@@ -46,8 +46,8 @@ const AddressBar: React.FC = () => {
           onBlur={() => setIsEditing(false)}
         />
       ) : (
-        <div className="flex items-center text-[13px] font-medium px-2 w-full overflow-hidden">
-          <div className="flex items-center gap-0.5">
+        <div className="flex items-center text-[13px] font-medium px-2 w-full overflow-x-auto no-scrollbar whitespace-nowrap">
+          <div className="flex items-center gap-0.5 min-w-max">
             {segments.map((segment, index) => (
               <React.Fragment key={index}>
                 <button 

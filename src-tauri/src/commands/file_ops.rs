@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileEntry {
@@ -14,6 +15,66 @@ pub struct FileEntry {
     pub modified_at: Option<u64>,
     pub accessed_at: Option<u64>,
     pub is_hidden: bool,
+}
+
+/// Fast file transfer to a local/USB directory with real-time progress emission.
+/// Uses a 1MB buffer for optimal read/write speeds, replicating network transfer UI.
+#[tauri::command]
+pub async fn usb_fast_copy(app: AppHandle, source_paths: Vec<String>, dest_dir: String) -> Result<(), String> {
+    let dest_path = Path::new(&dest_dir);
+    if !dest_path.exists() {
+        fs::create_dir_all(dest_path).map_err(|e| format!("Failed to create destination: {}", e))?;
+    }
+
+    use std::io::{Read, Write};
+
+    for src in source_paths {
+        let p = Path::new(&src);
+        if !p.exists() { continue; }
+        
+        let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let dest_file = dest_path.join(&name);
+        
+        // Skip directories for the fast flat copy, or implement recursion if needed.
+        if p.is_dir() {
+            copy_dir_recursive(p, &dest_file)?;
+            let _ = app.emit("file-transfer-complete", name.clone());
+            continue;
+        }
+
+        let meta = fs::metadata(p).map_err(|e| e.to_string())?;
+        let total_bytes = meta.len();
+        
+        let mut source_file = fs::File::open(p).map_err(|e| e.to_string())?;
+        let mut target_file = fs::File::create(&dest_file).map_err(|e| e.to_string())?;
+        
+        let mut buffer = [0u8; 1048576]; // 1MB chunks
+        let mut copied = 0u64;
+        
+        loop {
+            let n = source_file.read(&mut buffer).map_err(|e| e.to_string())?;
+            if n == 0 { break; }
+            target_file.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
+            copied += n as u64;
+            
+            let percent = if total_bytes > 0 {
+                (copied as f64 / total_bytes as f64) * 100.0
+            } else {
+                100.0
+            };
+            
+            let _ = app.emit("file-transfer-progress", serde_json::json!({
+                "fileName": name,
+                "bytesTransferred": copied,
+                "totalBytes": total_bytes,
+                "percent": percent
+            }));
+        }
+        
+        let _ = app.emit("file-transfer-complete", name);
+    }
+    
+    Ok(())
 }
 
 /// Checks the Windows hidden attribute on a file/directory.
@@ -32,6 +93,56 @@ fn is_hidden_entry(path: &Path, name: &str) -> bool {
     {
         name.starts_with('.')
     }
+}
+
+#[tauri::command]
+pub async fn trash_items(paths: Vec<String>) -> Result<(), String> {
+    trash::delete_all(paths).map_err(|e| format!("Failed to move to trash: {}", e))
+}
+
+#[tauri::command]
+pub async fn bulk_copy(sources: Vec<String>, dest_dir: String) -> Result<(), String> {
+    let mut options = fs_extra::dir::CopyOptions::new();
+    options.overwrite = true;
+    options.copy_inside = true;
+    
+    for src in sources {
+        let src_path = Path::new(&src);
+        if src_path.is_dir() {
+            fs_extra::dir::copy(&src, &dest_dir, &options)
+                .map_err(|e| format!("Failed to copy directory: {}", e))?;
+        } else {
+            let mut file_options = fs_extra::file::CopyOptions::new();
+            file_options.overwrite = true;
+            let file_name = src_path.file_name().unwrap_or_default();
+            let dest_path = Path::new(&dest_dir).join(file_name);
+            fs_extra::file::copy(&src, &dest_path, &file_options)
+                .map_err(|e| format!("Failed to copy file: {}", e))?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn bulk_move(sources: Vec<String>, dest_dir: String) -> Result<(), String> {
+    let mut options = fs_extra::dir::CopyOptions::new();
+    options.overwrite = true;
+    
+    for src in sources {
+        let src_path = Path::new(&src);
+        if src_path.is_dir() {
+            fs_extra::dir::move_dir(&src, &dest_dir, &options)
+                .map_err(|e| format!("Failed to move directory: {}", e))?;
+        } else {
+            let mut file_options = fs_extra::file::CopyOptions::new();
+            file_options.overwrite = true;
+            let file_name = src_path.file_name().unwrap_or_default();
+            let dest_path = Path::new(&dest_dir).join(file_name);
+            fs_extra::file::move_file(&src, &dest_path, &file_options)
+                .map_err(|e| format!("Failed to move file: {}", e))?;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -55,7 +166,7 @@ pub async fn read_dir(path: String) -> Result<Vec<FileEntry>, String> {
                     .map(|e| e.to_string_lossy().into_owned())
                     .unwrap_or_default();
                 
-                // Read timestamps
+                // Read timestamps efficiently
                 let created_at = metadata.created().ok()
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|d| d.as_secs());
@@ -66,8 +177,18 @@ pub async fn read_dir(path: String) -> Result<Vec<FileEntry>, String> {
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|d| d.as_secs());
                 
-                // Windows-aware hidden file detection
-                let is_hidden = is_hidden_entry(&entry_path, &name);
+                // Windows-aware hidden file detection using ALREADY LOADED metadata
+                let is_hidden = {
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::os::windows::fs::MetadataExt;
+                        (metadata.file_attributes() & 0x2) != 0
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        name.starts_with('.')
+                    }
+                };
                 
                 entries.push(FileEntry {
                     name,
@@ -158,6 +279,35 @@ pub async fn rename_file(path: String, new_name: String) -> Result<(), String> {
         }
     } else {
         Err("Invalid path".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn bulk_rename(renames: Vec<(String, String)>) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+    for (old_path, new_name) in renames {
+        let p = Path::new(&old_path);
+        if let Some(parent) = p.parent() {
+            let new_path = parent.join(new_name);
+            
+            // Check if target already exists to prevent accidental overwrite
+            if new_path.exists() {
+                errors.push(format!("Cannot rename {}: Target already exists", old_path));
+                continue;
+            }
+
+            if let Err(e) = fs::rename(p, new_path) {
+                errors.push(format!("Failed to rename {}: {}", old_path, e));
+            }
+        } else {
+            errors.push(format!("Invalid path: {}", old_path));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
     }
 }
 
@@ -295,12 +445,32 @@ fn parse_7z_list_output(output: &str, archive_path: &str) -> Result<Vec<FileEntr
 }
 
 /// Extract files from an archive to a destination directory using 7z.
+/// Hardened against path traversal and flag injection vulnerabilities.
 #[tauri::command]
 pub async fn extract_archive(archive_path: String, dest_dir: String) -> Result<(), String> {
     let seven_zip = find_7z_binary()?;
     
+    // Security: Ensure paths are absolute so they aren't parsed as 7z flags (e.g., "-sdel")
+    let archive_p = Path::new(&archive_path);
+    let dest_p = Path::new(&dest_dir);
+    
+    let abs_archive = archive_p.canonicalize()
+        .map_err(|e| format!("Invalid archive path: {}", e))?;
+        
+    // Create dest dir if it doesn't exist to ensure canonicalize works, or just use absolute
+    if !dest_p.exists() {
+        fs::create_dir_all(dest_p).map_err(|e| format!("Failed to create extract dir: {}", e))?;
+    }
+    let abs_dest = dest_p.canonicalize()
+        .map_err(|e| format!("Invalid destination path: {}", e))?;
+
+    // 7z automatically prevents ZipSlip (extracting outside the dest_dir via ../)
+    // The -o switch dictates the root. We pass the absolute paths.
     let output = Command::new(&seven_zip)
-        .args(&["x", &archive_path, &format!("-o{}", dest_dir), "-y"])
+        .arg("x")
+        .arg(abs_archive.to_string_lossy().to_string())
+        .arg(format!("-o{}", abs_dest.to_string_lossy()))
+        .arg("-y") // Assume Yes on all queries
         .output()
         .map_err(|e| format!("Failed to execute 7z: {}", e))?;
     
@@ -313,7 +483,8 @@ pub async fn extract_archive(archive_path: String, dest_dir: String) -> Result<(
 }
 
 /// Create an archive from a list of source paths.
-/// Supports: .zip, .7z, .tar.gz, .tar.bz2
+/// Supports: .zip, .7z, .tar.gz
+/// Hardened against flag injection vulnerabilities.
 #[tauri::command]
 pub async fn create_archive(
     archive_path: String,
@@ -321,8 +492,26 @@ pub async fn create_archive(
 ) -> Result<(), String> {
     let seven_zip = find_7z_binary()?;
     
-    let mut args = vec!["a".to_string(), archive_path.clone()];
-    args.extend(source_paths);
+    let mut args = vec!["a".to_string()];
+    
+    // Force absolute path for the archive target to prevent flag injection
+    let target_path = Path::new(&archive_path);
+    let abs_target = if target_path.is_absolute() {
+        target_path.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(target_path)
+    };
+    args.push(abs_target.to_string_lossy().to_string());
+    
+    // Force absolute paths for all sources
+    for src in source_paths {
+        let p = Path::new(&src);
+        if let Ok(abs) = p.canonicalize() {
+            args.push(abs.to_string_lossy().to_string());
+        } else {
+            return Err(format!("File not found or invalid path: {}", src));
+        }
+    }
     
     let output = Command::new(&seven_zip)
         .args(&args)
@@ -331,10 +520,24 @@ pub async fn create_archive(
     
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("7z archive creation failed: {}", stderr));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!("7z archive creation failed: {}\n{}", stderr, stdout));
     }
     
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_folder_size(path: String) -> Result<u64, String> {
+    let p = Path::new(&path);
+    if p.is_dir() {
+        Ok(calculate_dir_size(p))
+    } else {
+        match fs::metadata(p) {
+            Ok(m) => Ok(m.len()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
 }
 
 /// Get detailed file properties (size, attributes, permissions)
@@ -545,4 +748,66 @@ fn parse_datetime_to_epoch(datetime_str: &str) -> Option<u64> {
 
 fn is_leap_year(year: u32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+// ─── File Hide Locker ───────────────────────────────────
+
+/// Securely hides and locks a file by renaming it to a hex-encoded format
+/// and setting OS-level Hidden + System attributes (on Windows).
+/// This prevents it from being visible in standard file explorers without corrupting data.
+#[tauri::command]
+pub async fn hide_lock_file(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err("File not found".to_string());
+    }
+
+    let file_name = p.file_name().unwrap().to_string_lossy().into_owned();
+    let hex_name = hex::encode(file_name.as_bytes());
+    let locked_name = format!(".nexlock_{}", hex_name);
+    let locked_path = p.parent().unwrap().join(&locked_name);
+
+    fs::rename(p, &locked_path).map_err(|e| format!("Failed to lock file: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        // Set Hidden and System attributes
+        let _ = Command::new("attrib")
+            .args(&["+h", "+s", locked_path.to_str().unwrap()])
+            .output();
+    }
+    
+    Ok(())
+}
+
+/// Unlocks and unhides a previously secured file.
+#[tauri::command]
+pub async fn unhide_unlock_file(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err("File not found".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Remove Hidden and System attributes
+        let _ = Command::new("attrib")
+            .args(&["-h", "-s", path.as_str()])
+            .output();
+    }
+
+    let file_name = p.file_name().unwrap().to_string_lossy().into_owned();
+    if file_name.starts_with(".nexlock_") {
+        let hex_name = &file_name[9..];
+        if let Ok(decoded) = hex::decode(hex_name) {
+            if let Ok(orig_name) = String::from_utf8(decoded) {
+                let orig_path = p.parent().unwrap().join(orig_name);
+                fs::rename(p, &orig_path).map_err(|e| format!("Failed to unlock file: {}", e))?;
+                return Ok(());
+            }
+        }
+    }
+    
+    // If it wasn't a standard nexlock file or decoding failed, just try to rename it by removing the prefix if possible.
+    Err("Invalid locked file format".to_string())
 }

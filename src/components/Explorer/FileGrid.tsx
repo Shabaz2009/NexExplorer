@@ -1,16 +1,27 @@
-import React from 'react';
+import React, { useState, memo } from 'react';
 import { File, Folder, Image as ImageIcon, Music, Video, Archive, FileText, Code } from 'lucide-react';
 import { useFileSystem, FileEntry } from '../../hooks/useFileSystem';
 import { useExplorerStore } from '../../store/explorerStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useContextMenu } from '../../hooks/useContextMenu';
 import ContextMenu from './ContextMenu';
-import { motion, AnimatePresence } from 'framer-motion';
+import { VirtualizedGrid } from '../UI/VirtualizedContainer';
 
-const FileGrid: React.FC = () => {
-  const { files, loading, error } = useFileSystem();
-  const { setCurrentPath, currentPath } = useExplorerStore();
-  const { isOpen, position, target, openContextMenu, closeContextMenu } = useContextMenu();
-
+const FileItem = memo(({ 
+  file, 
+  index, 
+  isSelected, 
+  onDoubleClick, 
+  onClick, 
+  onContextMenu 
+}: { 
+  file: FileEntry, 
+  index: number, 
+  isSelected: boolean,
+  onDoubleClick: (file: FileEntry) => void,
+  onClick: (e: React.MouseEvent, file: FileEntry, index: number) => void,
+  onContextMenu: (e: React.MouseEvent, file: FileEntry, index: number) => void
+}) => {
   const getIcon = (entry: FileEntry) => {
     const iconSize = 40;
     if (entry.is_dir) return <Folder size={iconSize} className="text-accent mb-3 drop-shadow-xl" fill="currentColor" fillOpacity={0.2} strokeWidth={1.2} />;
@@ -37,11 +48,126 @@ const FileGrid: React.FC = () => {
     return <File size={iconSize} className="text-text-muted mb-3 drop-shadow-sm" strokeWidth={1.2} />;
   };
 
+  return (
+    <div 
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onDoubleClick(file);
+      }}
+      onClick={(e) => onClick(e, file, index)}
+      onContextMenu={(e) => onContextMenu(e, file, index)}
+      className={`flex flex-col items-center justify-start p-4 rounded-2xl glass-card cursor-pointer border hover:border-accent/40 hover:bg-bg-hover group interactive select-none w-full h-full ${isSelected ? 'bg-accent/10 border-accent/50' : 'border-border/50'}`}
+      title={file.name}
+    >
+      <div className="transform group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300 ease-out pointer-events-none">
+        {getIcon(file)}
+      </div>
+      <span className="text-[11px] font-medium text-center w-full px-1 text-text-secondary group-hover:text-text-primary break-all line-clamp-2 leading-tight mt-1">
+        {file.name}
+      </span>
+      
+      {isSelected && (
+        <div className="absolute inset-0 rounded-2xl border-2 border-accent transition-all pointer-events-none" />
+      )}
+    </div>
+  );
+});
+
+const FileGrid: React.FC = () => {
+  const { files, loading, error } = useFileSystem();
+  const { setCurrentPath } = useExplorerStore();
+  const { selectedPaths, toggleSelection, clearSelection, selectAll } = useSelectionStore();
+  const { isOpen, position, target, openContextMenu, closeContextMenu } = useContextMenu();
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
+  // Marquee state
+  const [marquee, setMarquee] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
   const handleDoubleClick = (entry: FileEntry) => {
     if (entry.is_dir) {
       setCurrentPath(entry.path);
     }
   };
+
+  const handleSelect = (e: React.MouseEvent, file: FileEntry, index: number) => {
+    e.stopPropagation();
+    if (e.shiftKey && lastSelectedIndex !== null) {
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const rangePaths = files.slice(start, end + 1).map(f => f.path);
+      const newSelection = (e.ctrlKey || e.metaKey) ? new Set(selectedPaths) : new Set<string>();
+      rangePaths.forEach(p => newSelection.add(p));
+      selectAll(Array.from(newSelection));
+    } else {
+      toggleSelection(file.path, e.ctrlKey || e.metaKey);
+      setLastSelectedIndex(index);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, file: FileEntry, index: number) => {
+    e.stopPropagation();
+    if (!selectedPaths.has(file.path)) {
+      selectAll([file.path]);
+      setLastSelectedIndex(index);
+    }
+    openContextMenu(e, { type: 'file', entry: file });
+  };
+
+  // Marquee logic
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left click
+    if (e.target !== e.currentTarget && !(e.target as HTMLElement).classList.contains('virtual-grid-container')) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+    const y = e.clientY - rect.top + e.currentTarget.scrollTop;
+    
+    setMarquee({ startX: x, startY: y, currentX: x, currentY: y });
+    if (!e.ctrlKey && !e.metaKey) clearSelection();
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!marquee) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+    const y = e.clientY - rect.top + e.currentTarget.scrollTop;
+    
+    setMarquee(prev => prev ? { ...prev, currentX: x, currentY: y } : null);
+
+    // Calculate selection
+    const x1 = Math.min(marquee.startX, x);
+    const y1 = Math.min(marquee.startY, y);
+    const x2 = Math.max(marquee.startX, x);
+    const y2 = Math.max(marquee.startY, y);
+
+    const itemWidth = 110;
+    const itemHeight = 120;
+    const gap = 16;
+    const padding = 16;
+    
+    const containerWidth = rect.width;
+    const itemsPerRow = Math.max(1, Math.floor((containerWidth - gap) / (itemWidth + gap)));
+
+    const newSelected = new Set(e.ctrlKey || e.metaKey ? selectedPaths : []);
+    
+    files.forEach((file, i) => {
+      const row = Math.floor(i / itemsPerRow);
+      const col = i % itemsPerRow;
+      const itemX = padding + col * (itemWidth + gap);
+      const itemY = padding + row * (itemHeight + gap);
+      
+      const intersects = x1 < itemX + itemWidth && x2 > itemX && y1 < itemY + itemHeight && y2 > itemY;
+      if (intersects) {
+        newSelected.add(file.path);
+      }
+    });
+
+    selectAll(Array.from(newSelected));
+  };
+
+  const onMouseUp = () => setMarquee(null);
 
   if (loading) {
     return (
@@ -80,33 +206,44 @@ const FileGrid: React.FC = () => {
 
   return (
     <div 
-      className="p-6 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-4 h-full content-start"
+      ref={containerRef}
+      className="w-full h-full relative"
       onContextMenu={(e) => openContextMenu(e, { type: 'empty' })}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseUp}
     >
-      <AnimatePresence mode="popLayout">
-        {files.map((file, idx) => (
-          <motion.div 
-            key={file.path} 
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: Math.min(idx * 0.01, 0.2), duration: 0.2 }}
-            onDoubleClick={() => handleDoubleClick(file)}
-            onContextMenu={(e) => openContextMenu(e, { type: 'file', entry: file })}
-            className="flex flex-col items-center justify-start p-4 rounded-2xl glass-card cursor-pointer border border-border/50 hover:border-accent/40 hover:bg-bg-hover group interactive select-none"
-            title={file.name}
-          >
-            <div className="transform group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300 ease-out pointer-events-none">
-              {getIcon(file)}
-            </div>
-            <span className="text-[11px] font-medium text-center w-full truncate px-1 text-text-secondary group-hover:text-text-primary group-hover:whitespace-normal break-words line-clamp-2 leading-tight">
-              {file.name}
-            </span>
-            
-            {/* Subtle indicator for selection/focus would go here */}
-            <div className="absolute inset-0 rounded-2xl border-2 border-accent/0 group-active:border-accent/30 transition-all pointer-events-none" />
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      <VirtualizedGrid 
+        items={files}
+        itemWidth={110}
+        itemHeight={120}
+        gap={16}
+        containerClassName="virtual-grid-container"
+        renderItem={(file, idx) => (
+          <FileItem 
+            file={file}
+            index={idx}
+            isSelected={selectedPaths.has(file.path)}
+            onDoubleClick={handleDoubleClick}
+            onClick={handleSelect}
+            onContextMenu={handleContextMenu}
+          />
+        )}
+      />
+
+      {marquee && (
+        <div 
+          className="absolute border border-accent bg-accent/20 pointer-events-none z-50 rounded-sm"
+          style={{
+            left: Math.min(marquee.startX, marquee.currentX),
+            top: Math.min(marquee.startY, marquee.currentY) - (containerRef.current?.scrollTop || 0),
+            width: Math.abs(marquee.startX - marquee.currentX),
+            height: Math.abs(marquee.startY - marquee.currentY)
+          }}
+        />
+      )}
+
       <ContextMenu isOpen={isOpen} position={position} target={target} onClose={closeContextMenu} />
     </div>
   );

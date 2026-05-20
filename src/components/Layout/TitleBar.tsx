@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { Minus, Square, X } from 'lucide-react';
 import { useWindowStore } from '../../store/windowStore';
 import { Window } from '@tauri-apps/api/window';
 
@@ -10,7 +9,7 @@ declare global {
 }
 
 const TitleBar: React.FC = () => {
-  const { isMaximized, isFocused, setMaximized, setFocused } = useWindowStore();
+  const { isFocused, setFocused } = useWindowStore();
 
   useEffect(() => {
     // We only execute Tauri-specific code if we are in Tauri
@@ -21,37 +20,11 @@ const TitleBar: React.FC = () => {
         setFocused(focused);
       });
 
-      const unlistenResize = appWindow.onResized(() => {
-        appWindow.isMaximized().then(setMaximized);
-      });
-
-      // Initial check
-      appWindow.isMaximized().then(setMaximized);
-
       return () => {
         unlistenFocus.then(f => f());
-        unlistenResize.then(f => f());
       };
     }
-  }, [setFocused, setMaximized]);
-
-  const handleMinimize = () => {
-    if (window.__TAURI__) {
-      new Window('main').minimize();
-    }
-  };
-
-  const handleMaximize = () => {
-    if (window.__TAURI__) {
-      new Window('main').toggleMaximize();
-    }
-  };
-
-  const handleClose = () => {
-    if (window.__TAURI__) {
-      new Window('main').close();
-    }
-  };
+  }, [setFocused]);
 
   return (
     <div 
@@ -59,38 +32,13 @@ const TitleBar: React.FC = () => {
       className={`h-8 flex items-center justify-between select-none ${isFocused ? 'bg-bg-primary text-text-primary' : 'bg-bg-primary opacity-80 text-text-muted'}`}
     >
       <div className="flex items-center px-3 gap-2 pointer-events-none">
-        <div className="w-4 h-4 bg-accent rounded-sm flex items-center justify-center text-[10px] text-white font-bold">N</div>
-        <span className="text-xs font-semibold">NexExplorer</span>
+        <img src="/logo.png" className="w-4 h-4 object-contain" alt="NexExplorer" />
+        <span className="text-xs font-semibold uppercase tracking-widest opacity-60">NexExplorer</span>
       </div>
       
-      <div className="flex h-full">
-        <button 
-          onClick={handleMinimize}
-          className="w-11 h-full flex items-center justify-center hover:bg-bg-hover transition-colors"
-          tabIndex={-1}
-        >
-          <Minus size={16} strokeWidth={1.5} />
-        </button>
-        <button 
-          onClick={handleMaximize}
-          className="w-11 h-full flex items-center justify-center hover:bg-bg-hover transition-colors"
-          tabIndex={-1}
-        >
-          {isMaximized ? (
-            <div className="relative w-3.5 h-3.5 border border-current mt-1 mr-1">
-              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 border border-current border-b-0 border-l-0"></div>
-            </div>
-          ) : (
-            <Square size={14} strokeWidth={1.5} />
-          )}
-        </button>
-        <button 
-          onClick={handleClose}
-          className="w-11 h-full flex items-center justify-center hover:bg-error hover:text-white transition-colors"
-          tabIndex={-1}
-        >
-          <X size={16} strokeWidth={1.5} />
-        </button>
+      {/* Standard OS buttons are now enabled in tauri.conf.json for maximum reliability */}
+      <div className="flex h-full px-4 items-center">
+         <div className="w-2 h-2 rounded-full bg-accent/20 animate-pulse" />
       </div>
     </div>
   );

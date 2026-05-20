@@ -8,11 +8,12 @@ const StatusBar: React.FC = () => {
   const { files } = useFileSystem();
   const { selectedPaths } = useSelectionStore();
 
-  // Calculate selected size
-  const selectedSize = Array.from(selectedPaths).reduce((acc, path) => {
-    const file = files.find(f => f.path === path);
-    return acc + (file?.size || 0);
-  }, 0);
+  // Optimized size calculation using a Map lookup
+  const selectedSize = React.useMemo(() => {
+    if (selectedPaths.size === 0) return 0;
+    const fileMap = new Map(files.map(f => [f.path, f.size]));
+    return Array.from(selectedPaths).reduce((acc, path) => acc + (fileMap.get(path) || 0), 0);
+  }, [files, selectedPaths]);
 
   // Note: in a real implementation we would fetch drive space from rust
   // For now we will mock it or leave it generic

@@ -15,8 +15,8 @@
         "title": "NexExplorer",
         "width": 1024,
         "height": 768,
-        "decorations": false,
-        "transparent": true,
+        "decorations": true,
+        "transparent": false,
         "minWidth": 800,
         "minHeight": 600
       }

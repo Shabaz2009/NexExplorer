@@ -7,7 +7,8 @@
 
 @layer base {
   html, body {
-    @apply h-full overflow-hidden;
+    height: 100%;
+    overflow: hidden;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     font-size: 14px;
@@ -16,7 +17,7 @@
   }
   
   #root {
-    @apply h-full;
+    height: 100%;
   }
 
   /* Scrollbar Styling */
@@ -38,20 +39,20 @@
 
 @layer components {
   .glass {
-    @apply backdrop-blur-md bg-opacity-70;
+    backdrop-filter: blur(12px);
     background-color: var(--bg-glass);
     border-color: var(--border-color);
   }
-  
+
   .glass-card {
-    @apply backdrop-blur-sm border bg-opacity-40;
+    backdrop-filter: blur(4px);
+    border-width: 1px;
     background-color: var(--bg-secondary);
     border-color: var(--border-color);
     box-shadow: var(--shadow-sm);
   }
-
   .interactive {
-    @apply transition-all duration-200 ease-out;
+    transition: all 200ms ease-out;
   }
 }
 

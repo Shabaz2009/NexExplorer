@@ -20,32 +20,57 @@ export function useFileSystem() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDirectory = async (path: string) => {
+  const loadDirectory = async (path: string, search?: string) => {
     setLoading(true);
     setError(null);
     try {
       let entries: FileEntry[] = [];
       
-      // Basic check if path is an archive (e.g. C:\test.zip or inside an archive C:\test.zip\\folder)
-      // For now, if the path contains .zip, .rar, .7z we call list_archive
-      const isArchive = /\.(zip|rar|7z|tar|gz)(\\|\/|$)/i.test(path);
-      
-      if (isArchive) {
-        entries = await invoke('list_archive', { path });
+      if (search) {
+        entries = await invoke('recursive_search', { path, query: search });
+      } else if (path.startsWith('http://') || path.startsWith('https://')) {
+        // Handle Remote LAN Server Path
+        // ... (rest of remote logic)
+        const urlObj = new URL(path);
+        const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+        const subPath = decodeURIComponent(urlObj.pathname.replace(/^\//, ''));
+        
+        const response = await fetch(`${baseUrl}/api/files?path=${encodeURIComponent(subPath)}`);
+        if (!response.ok) throw new Error('Failed to fetch remote directory');
+        
+        const data = await response.json();
+        
+        entries = (data.files || []).map((f: any) => ({
+          name: f.name,
+          path: `${baseUrl}/${f.path}`,
+          is_dir: f.is_dir,
+          size: f.size,
+          extension: f.name.split('.').pop() || '',
+          created_at: null,
+          modified_at: new Date(f.modified).getTime() / 1000,
+          accessed_at: null,
+          is_hidden: f.name.startsWith('.'),
+        }));
       } else {
-        entries = await invoke('read_dir', { path });
+        const isArchive = /\.(zip|rar|7z|tar|gz)(\\|\/|$)/i.test(path);
+        if (isArchive) {
+          entries = await invoke('list_archive', { path });
+        } else {
+          entries = await invoke('read_dir', { path });
+        }
       }
       
-      if (!showHidden) {
+      if (!showHidden && !search) {
         entries = entries.filter(e => !e.is_hidden);
       }
       
-      // Basic sorting: folders first, then by name
-      entries.sort((a, b) => {
-        if (a.is_dir && !b.is_dir) return -1;
-        if (!a.is_dir && b.is_dir) return 1;
-        return a.name.localeCompare(b.name);
-      });
+      if (!search) {
+        entries.sort((a, b) => {
+          if (a.is_dir && !b.is_dir) return -1;
+          if (!a.is_dir && b.is_dir) return 1;
+          return a.name.localeCompare(b.name);
+        });
+      }
       
       setFiles(entries);
     } catch (err) {
@@ -58,7 +83,14 @@ export function useFileSystem() {
   };
 
   useEffect(() => {
+    const handleSearch = (e: any) => {
+      loadDirectory(currentPath, e.detail);
+    };
+    window.addEventListener('nex-search', handleSearch);
+    
     loadDirectory(currentPath);
+    
+    return () => window.removeEventListener('nex-search', handleSearch);
   }, [currentPath, showHidden]);
 
   return { files, loading, error, refresh: () => loadDirectory(currentPath) };

@@ -15,6 +15,7 @@ interface ExplorerState {
   showExtensions: boolean;
   showPreviewPane: boolean;
   showDetailsPane: boolean;
+  quickLookFile: string | null; // Path of the file being previewed
   // Inspired by Explorer++ Config.h: bool dualPane = false
   dualPane: boolean;
   // Navigation history stack
@@ -30,6 +31,7 @@ interface ExplorerState {
   toggleExtensions: () => void;
   togglePreviewPane: () => void;
   toggleDetailsPane: () => void;
+  setQuickLookFile: (path: string | null) => void;
   toggleDualPane: () => void;
   navigateTo: (path: string) => void;
   goBack: () => void;
@@ -48,6 +50,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   showExtensions: true,
   showPreviewPane: false,
   showDetailsPane: false,
+  quickLookFile: null,
   dualPane: false,
   history: ['C:\\'],
   historyIndex: 0,
@@ -61,6 +64,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   toggleExtensions: () => set((state) => ({ showExtensions: !state.showExtensions })),
   togglePreviewPane: () => set((state) => ({ showPreviewPane: !state.showPreviewPane })),
   toggleDetailsPane: () => set((state) => ({ showDetailsPane: !state.showDetailsPane })),
+  setQuickLookFile: (path) => set({ quickLookFile: path }),
   toggleDualPane: () => set((state) => ({ 
     dualPane: !state.dualPane,
     viewMode: !state.dualPane ? 'dualpane' : 'md',
@@ -104,7 +108,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     const parts = state.currentPath.split('\\').filter(Boolean);
     if (parts.length > 1) {
       parts.pop();
-      const parentPath = parts.join('\\') + '\\';
+      const isDrive = parts.length === 1 && parts[0].endsWith(':');
+      const parentPath = parts.join('\\') + (isDrive ? '\\' : '');
       get().navigateTo(parentPath);
     }
   },

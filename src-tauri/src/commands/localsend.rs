@@ -109,7 +109,7 @@ pub async fn start_discovery(app: tauri::AppHandle) -> Result<(), String> {
                             // If this is an announcement, respond back (mirrors _answerAnnouncement)
                             if dto.announcement == Some(true) || dto.announce == Some(true) {
                                 let response = MulticastDto {
-                                    alias: "NexExplorer".to_string(),
+                                    alias: get_hostname(),
                                     version: Some(PROTOCOL_VERSION.to_string()),
                                     device_model: Some(get_hostname()),
                                     device_type: Some("desktop".to_string()),
@@ -144,6 +144,30 @@ pub async fn start_discovery(app: tauri::AppHandle) -> Result<(), String> {
         }
     });
 
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn send_text_to_device(
+    text: String,
+    target_ip: String,
+    target_port: u16,
+) -> Result<(), String> {
+    let addr: SocketAddr = format!("{}:{}", target_ip, target_port + 1).parse().unwrap();
+    let mut stream = TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(10))
+        .map_err(|e| format!("Failed to connect to {}: {}", addr, e))?;
+    
+    let info = FileTransferInfo {
+        file_name: "Text Content".to_string(),
+        file_size: text.len() as u64,
+        sender_alias: get_hostname(),
+        sender_ip: "0.0.0.0".to_string(),
+    };
+    
+    let header = serde_json::to_string(&info).unwrap();
+    stream.write_all(format!("{}\n", header).as_bytes()).unwrap();
+    stream.write_all(text.as_bytes()).unwrap();
+    
     Ok(())
 }
 
