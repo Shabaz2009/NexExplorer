@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use sha2::{Sha256, Digest};
 use md5;
 use hex;
+use walkdir::WalkDir;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileHashes {
@@ -16,7 +17,7 @@ pub async fn recursive_search(path: String, query: String) -> Result<Vec<super::
     let mut entries = Vec::new();
     let query_lower = query.to_lowercase();
 
-    for entry in walkdir::WalkDir::new(&path)
+    for entry in WalkDir::new(&path)
         .max_depth(5) // Limit depth to prevent infinite loops/long waits
         .into_iter()
         .filter_map(|e| e.ok()) {
@@ -45,7 +46,7 @@ pub async fn recursive_search(path: String, query: String) -> Result<Vec<super::
             }
         }
 
-        if entries.length() > 500 { break; } // Limit results for performance
+        if entries.len() > 500 { break; } // Limit results for performance
     }
     Ok(entries)
 }

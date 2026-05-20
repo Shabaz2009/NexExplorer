@@ -62,18 +62,17 @@ pub async fn usb_fast_copy(app: AppHandle, source_paths: Vec<String>, dest_dir: 
             } else {
                 100.0
             };
-            
+
             let _ = app.emit("file-transfer-progress", serde_json::json!({
-                "fileName": name,
+                "fileName": name.clone(),
                 "bytesTransferred": copied,
                 "totalBytes": total_bytes,
                 "percent": percent
             }));
-        }
-        
-        let _ = app.emit("file-transfer-complete", name);
-    }
-    
+            }
+
+            let _ = app.emit("file-transfer-complete", name);
+            }    
     Ok(())
 }
 
