@@ -169,6 +169,7 @@ impl ServerManager {
                     }
                 }
 
+                let upnp_mapped = external_url.is_some();
                 Ok(ServerStatus {
                     running: true,
                     server_type,
@@ -178,7 +179,7 @@ impl ServerManager {
                     local_url,
                     hostname_url,
                     external_url,
-                    upnp_mapped: external_url.is_some(),
+                    upnp_mapped,
                     share_path,
                     files_count: count_files(&config.share_path),
                     bytes_sent: 0,

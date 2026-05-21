@@ -8,6 +8,8 @@ import BatchRenamer from '../Tools/BatchRenamer';
 import { useFileOperations } from '../../hooks/useFileOperations';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { useSelectionStore } from '../../store/selectionStore';
+import { useNexDropStore } from '../../store/nexDropStore';
+import { useExplorerStore } from '../../store/explorerStore';
 
 /**
  * ContextMenu — Inspired by Explorer++ ShellBrowserContextMenuDelegate
@@ -30,6 +32,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
   const { handleCopy, handleCut, handlePaste, handleTrash, handleRename } = useFileOperations();
   const { refresh } = useFileSystem();
   const { selectedPaths } = useSelectionStore();
+  const { addQueuedPaths } = useNexDropStore();
+  const { navigateTo } = useExplorerStore();
 
   if (!isOpen && !showProperties && !showHashChecker && !showDiskAnalyzer && !showDuplicateFinder && !showBatchRenamer) return null;
 
@@ -39,6 +43,13 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
   const isDir = target?.entry?.is_dir || false;
   const fileName = target?.entry?.name || '';
   const isLockedFile = fileName.startsWith('.nexlock_');
+
+  const handleNexDropSend = () => {
+    const paths = isMulti ? Array.from(selectedPaths) : [filePath];
+    addQueuedPaths(paths);
+    navigateTo('nexdrop://');
+    onClose();
+  };
 
   const handleVerb = async (verb: string) => {
     switch (verb) {
@@ -241,10 +252,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
           
           <div className="h-px bg-border my-1"></div>
           <button 
-            onClick={() => handleVerb('localshare-send')}
+            onClick={handleNexDropSend}
             className="w-full px-4 py-2 text-left bg-accent/10 hover:bg-accent hover:text-accent-text text-accent font-semibold transition-colors"
           >
-            📤 Send via LocalShare
+            📤 Send via NexDrop
           </button>
           
           <div className="h-px bg-border my-1"></div>

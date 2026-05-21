@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Home, Download, FileText, Image, Music, Video, Star, Wifi, Settings, Shield, Monitor } from 'lucide-react';
 import { useExplorerStore } from '../../store/explorerStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { motion } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { desktopDir, downloadDir, documentDir, pictureDir, audioDir, videoDir } from '@tauri-apps/api/path';
@@ -22,6 +23,7 @@ interface NavItem {
 
 const Sidebar: React.FC = () => {
   const { currentPath, navigateTo } = useExplorerStore();
+  const { openSettings } = useSettingsStore();
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [navItems, setNavItems] = useState<NavItem[]>([]);
   
@@ -119,25 +121,25 @@ const Sidebar: React.FC = () => {
           </div>
         </section>
 
-        {/* LocalShare */}
+        {/* NexDrop */}
         <section>
           <div className="px-3 mb-2">
             <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Network</span>
           </div>
           <motion.button 
             whileHover={{ scale: 1.02 }}
-            onClick={() => navigateTo('localshare://')}
+            onClick={() => navigateTo('nexdrop://')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-[13px] font-semibold interactive ${
-              currentPath === 'localshare://' 
+              currentPath === 'nexdrop://' 
                 ? 'bg-accent text-white shadow-xl shadow-accent/30' 
                 : 'bg-bg-tertiary/50 border border-border/50 text-text-secondary hover:text-text-primary hover:border-accent/30'
             }`}
           >
             <div className="flex items-center gap-3">
-              <Wifi size={18} className={currentPath === 'localshare://' ? 'text-white' : 'text-accent'} />
-              <span>LocalShare</span>
+              <Wifi size={18} className={currentPath === 'nexdrop://' ? 'text-white' : 'text-accent'} />
+              <span>NexDrop</span>
             </div>
-            <div className={`text-[10px] px-2 py-0.5 rounded-full ${currentPath === 'localshare://' ? 'bg-white/20' : 'bg-accent/20 text-accent'}`}>
+            <div className={`text-[10px] px-2 py-0.5 rounded-full ${currentPath === 'nexdrop://' ? 'bg-white/20' : 'bg-accent/20 text-accent'}`}>
               LIVE
             </div>
           </motion.button>
@@ -147,7 +149,7 @@ const Sidebar: React.FC = () => {
       {/* Footer Settings */}
       <div className="p-4 border-t border-border/50">
         <div className="flex items-center justify-between gap-2 px-2">
-          <button className="p-2 rounded-lg hover:bg-bg-hover interactive text-text-muted hover:text-text-primary">
+          <button onClick={openSettings} className="p-2 rounded-lg hover:bg-bg-hover interactive text-text-muted hover:text-text-primary" title="Settings">
             <Settings size={18} />
           </button>
           <button className="p-2 rounded-lg hover:bg-bg-hover interactive text-text-muted hover:text-text-primary">

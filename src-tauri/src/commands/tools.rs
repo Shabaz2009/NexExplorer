@@ -133,7 +133,7 @@ fn build_disk_node(path: &Path) -> DiskNode {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DuplicateGroup {
     pub hash: String,
-    pub files: Vec<FileEntry>,
+    pub files: Vec<super::file_ops::FileEntry>,
     pub size: u64,
 }
 

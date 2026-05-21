@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ArrowUp, Search, Settings, Moon, Sun, Monitor, W
 import AddressBar from './AddressBar';
 import { useTheme } from '../../hooks/useTheme';
 import { useExplorerStore } from '../../store/explorerStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import DiskAnalyzer from '../Tools/DiskAnalyzer';
 import DuplicateFinder from '../Tools/DuplicateFinder';
 
@@ -12,6 +13,7 @@ const Toolbar: React.FC = () => {
   const [showTools, setShowTools] = useState(false);
   const [activeTool, setActiveTool] = useState<'analyzer' | 'duplicates' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const { openSettings } = useSettingsStore();
 
   const cycleTheme = () => {
     if (theme === 'system') setTheme('dark');
@@ -108,7 +110,7 @@ const Toolbar: React.FC = () => {
           )}
         </div>
 
-        <button className="p-1.5 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary">
+        <button onClick={openSettings} className="p-1.5 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary" title="Settings">
           <Settings size={18} />
         </button>
         <button 

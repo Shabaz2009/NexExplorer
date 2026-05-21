@@ -19,10 +19,10 @@ interface SettingsState {
   maxFilesBeforePaginate: number;
   shellIntegration: boolean;
 
-  localShareAlias: string;
-  localShareSaveDirectory: string;
-  localSharePort: number;
-  localShareAutoAccept: boolean;
+  nexDropAlias: string;
+  nexDropSaveDirectory: string;
+  nexDropPort: number;
+  nexDropAutoAccept: boolean;
 
   openSettings: () => void;
   closeSettings: () => void;
@@ -39,10 +39,10 @@ interface SettingsState {
   setMaxFilesBeforePaginate: (count: number) => void;
   setShellIntegration: (enabled: boolean) => void;
 
-  setLocalShareAlias: (alias: string) => void;
-  setLocalShareSaveDirectory: (dir: string) => void;
-  setLocalSharePort: (port: number) => void;
-  setLocalShareAutoAccept: (autoAccept: boolean) => void;
+  setNexDropAlias: (alias: string) => void;
+  setNexDropSaveDirectory: (dir: string) => void;
+  setNexDropPort: (port: number) => void;
+  setNexDropAutoAccept: (autoAccept: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -62,10 +62,10 @@ export const useSettingsStore = create<SettingsState>()(
       maxFilesBeforePaginate: 1000,
       shellIntegration: false,
 
-      localShareAlias: '',
-      localShareSaveDirectory: '',
-      localSharePort: 53317,
-      localShareAutoAccept: true,
+      nexDropAlias: '',
+      nexDropSaveDirectory: '',
+      nexDropPort: 53317,
+      nexDropAutoAccept: true,
 
       openSettings: () => set({ isSettingsOpen: true }),
       closeSettings: () => set({ isSettingsOpen: false }),
@@ -82,10 +82,10 @@ export const useSettingsStore = create<SettingsState>()(
       setMaxFilesBeforePaginate: (maxFilesBeforePaginate) => set({ maxFilesBeforePaginate }),
       setShellIntegration: (shellIntegration) => set({ shellIntegration }),
 
-      setLocalShareAlias: (localShareAlias) => set({ localShareAlias }),
-      setLocalShareSaveDirectory: (localShareSaveDirectory) => set({ localShareSaveDirectory }),
-      setLocalSharePort: (localSharePort) => set({ localSharePort }),
-      setLocalShareAutoAccept: (localShareAutoAccept) => set({ localShareAutoAccept }),
+      setNexDropAlias: (nexDropAlias) => set({ nexDropAlias }),
+      setNexDropSaveDirectory: (nexDropSaveDirectory) => set({ nexDropSaveDirectory }),
+      setNexDropPort: (nexDropPort) => set({ nexDropPort }),
+      setNexDropAutoAccept: (nexDropAutoAccept) => set({ nexDropAutoAccept }),
     }),
     {
       name: 'nex-settings',

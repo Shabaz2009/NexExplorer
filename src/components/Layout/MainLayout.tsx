@@ -6,6 +6,7 @@ import StatusBar from './StatusBar';
 import ExplorerView from '../Explorer/ExplorerView';
 import TabBar from './TabBar';
 import QuickLook from '../Explorer/QuickLook';
+import SettingsPanel from './SettingsPanel';
 import { invoke } from '@tauri-apps/api/core';
 import { useKeyboard } from '../../hooks/useKeyboard';
 import { useTabStore } from '../../store/tabStore';
@@ -41,6 +42,7 @@ const MainLayout: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-bg-primary text-text-primary overflow-hidden font-sans select-none">
       <QuickLook />
+      <SettingsPanel />
       {/* Title Bar - Draggable */}
       <div className="glass border-b border-border z-50">
         <TitleBar />

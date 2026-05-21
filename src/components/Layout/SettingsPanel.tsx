@@ -218,18 +218,18 @@ const SettingsPanel: React.FC = () => {
 
               <div className="h-px bg-border" />
 
-              {/* ─── LOCALSHARE ──────────────── */}
+              {/* ─── NEXDROP ─────────────────── */}
               <section>
                 <h3 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <Wifi size={12} /> LocalShare
+                  <Wifi size={12} /> NexDrop
                 </h3>
 
                 <div className="py-3 px-1">
                   <div className="text-[13px] font-medium text-text-primary mb-1">Device Alias</div>
                   <input
                     type="text"
-                    value={useSettingsStore(s => s.localShareAlias) || ''}
-                    onChange={(e) => useSettingsStore.getState().setLocalShareAlias(e.target.value)}
+                    value={useSettingsStore(s => s.nexDropAlias) || ''}
+                    onChange={(e) => useSettingsStore.getState().setNexDropAlias(e.target.value)}
                     placeholder="Auto (Hostname)"
                     className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
                   />
@@ -240,12 +240,28 @@ const SettingsPanel: React.FC = () => {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      value={useSettingsStore(s => s.localShareSaveDirectory) || ''}
-                      onChange={(e) => useSettingsStore.getState().setLocalShareSaveDirectory(e.target.value)}
+                      value={useSettingsStore(s => s.nexDropSaveDirectory) || ''}
+                      onChange={(e) => useSettingsStore.getState().setNexDropSaveDirectory(e.target.value)}
                       placeholder="Auto (Downloads)"
                       className="flex-1 bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
                     />
-                    <button className="px-3 bg-bg-tertiary border border-border rounded-lg hover:bg-bg-hover">
+                    <button
+                      className="px-3 bg-bg-tertiary border border-border rounded-lg hover:bg-bg-hover"
+                      onClick={async () => {
+                        try {
+                          const selected = await invoke<string | null>('plugin:dialog|open', {
+                            directory: true,
+                            multiple: false,
+                            title: 'Select NexDrop Save Directory',
+                          });
+                          if (selected) {
+                            useSettingsStore.getState().setNexDropSaveDirectory(selected);
+                          }
+                        } catch (err) {
+                          console.error('Folder picker failed:', err);
+                        }
+                      }}
+                    >
                       <FolderOpen size={16} className="text-text-muted" />
                     </button>
                   </div>
@@ -255,8 +271,8 @@ const SettingsPanel: React.FC = () => {
                   <div className="text-[13px] font-medium text-text-primary mb-1">Port</div>
                   <input
                     type="number"
-                    value={useSettingsStore(s => s.localSharePort)}
-                    onChange={(e) => useSettingsStore.getState().setLocalSharePort(Number(e.target.value))}
+                    value={useSettingsStore(s => s.nexDropPort)}
+                    onChange={(e) => useSettingsStore.getState().setNexDropPort(Number(e.target.value))}
                     placeholder="53317"
                     className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
                   />
@@ -265,8 +281,8 @@ const SettingsPanel: React.FC = () => {
                 <ToggleRow
                   label="Auto-accept files"
                   description="Automatically receive incoming files without prompt"
-                  checked={useSettingsStore(s => s.localShareAutoAccept)}
-                  onChange={(val) => useSettingsStore.getState().setLocalShareAutoAccept(val)}
+                  checked={useSettingsStore(s => s.nexDropAutoAccept)}
+                  onChange={(val) => useSettingsStore.getState().setNexDropAutoAccept(val)}
                   icon={<Shield size={16} />}
                 />
               </section>

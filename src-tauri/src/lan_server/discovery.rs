@@ -47,11 +47,10 @@ impl DiscoveryManager {
 
     /// Broadcast our presence on the network
     pub async fn start_broadcast(&self, port: u16, server_type: &ServerType) -> ServerResult<()> {
-        let mdns = self
-            .mdns
-            .as_ref()
-            .ok_or_else(|| ServerError::Network("mDNS not available".into()))?
-            .clone();
+        let mdns = match self.mdns.as_ref() {
+            Some(d) => d,
+            None => return Err(ServerError::Network("mDNS not available".into())),
+        };
 
         let local_ip = get_local_ip_addr()?;
         let service_name = format!("{}._nexexplorer._tcp.local.", self.hostname);

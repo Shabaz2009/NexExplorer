@@ -41,12 +41,12 @@ fn main() {
             commands::file_ops::list_archive,
             commands::file_ops::extract_archive,
             commands::file_ops::create_archive,
-            // LocalShare device discovery (ported from LocalSend protocol 2.1)
-            commands::localsend::start_discovery,
-            commands::localsend::send_multicast_announcement,
-            commands::localsend::start_file_receiver,
-            commands::localsend::send_file_to_device,
-            commands::localsend::send_text_to_device,
+            // NexDrop device discovery & local sharing (ported from LocalSend protocol 2.1)
+            commands::nexdrop::start_nexdrop_discovery,
+            commands::nexdrop::send_nexdrop_announcement,
+            commands::nexdrop::start_nexdrop_receiver,
+            commands::nexdrop::send_file_via_nexdrop,
+            commands::nexdrop::send_text_via_nexdrop,
             // Shell extension (inspired by PeaZip.ShellEx)
             commands::shell_ex::register_shell_extension,
             commands::shell_ex::unregister_shell_extension,

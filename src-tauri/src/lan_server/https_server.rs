@@ -2,7 +2,7 @@ use axum::Router;
 use axum::routing::{delete, get, post};
 use axum_server::tls_rustls::RustlsConfig;
 use rcgen::{CertificateParams, DistinguishedName, KeyPair};
-use std::path::PathBuf;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -18,7 +18,10 @@ fn generate_cert(hostname: &str) -> ServerResult<(String, String)> {
     params.distinguished_name = dn;
     params
         .subject_alt_names
-        .push(rcgen::SanType::DnsName(hostname.to_string()));
+        .push(rcgen::SanType::DnsName(
+            rcgen::Ia5String::try_from(hostname.to_string())
+                .map_err(|e| ServerError::Tls(format!("Invalid hostname for SAN: {}", e)))?,
+        ));
     params
         .subject_alt_names
         .push(rcgen::SanType::IpAddress("127.0.0.1".parse().unwrap()));
@@ -65,6 +68,7 @@ pub async fn start_https_server(
         allow_upload: config.allow_upload,
         allow_delete: config.allow_delete,
         bytes_sent: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        bytes_received: Arc::new(std::sync::atomic::AtomicU64::new(0)),
     };
 
     let app = Router::new()
@@ -82,11 +86,19 @@ pub async fn start_https_server(
     let (tx, rx) = oneshot::channel::<()>();
 
     tokio::spawn(async move {
-        axum_server::bind_rustls(format!("0.0.0.0:{}", port), tls_config)
+        let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
+        let handle = axum_server::Handle::new();
+        let handle_clone = handle.clone();
+
+        // Spawn a task to trigger graceful shutdown when rx fires
+        tokio::spawn(async move {
+            let _ = rx.await;
+            handle_clone.graceful_shutdown(Some(std::time::Duration::from_secs(5)));
+        });
+
+        axum_server::bind_rustls(addr, tls_config)
+            .handle(handle)
             .serve(app.into_make_service())
-            .with_graceful_shutdown(async {
-                let _ = rx.await;
-            })
             .await
             .ok();
     });

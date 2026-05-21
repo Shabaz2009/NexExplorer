@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { QRCodeSVG } from 'qrcode.react';
 import './ServerPanel.css';
 
 interface ServerConfig {
@@ -195,6 +196,13 @@ export default function ServerPanel() {
 
   const isRunning = status?.running ?? false;
   const typeInfo = SERVER_TYPES.find(t => t.id === selectedType);
+  const [selectedQRType, setSelectedQRType] = useState<'local' | 'hostname' | 'external'>('local');
+
+  const qrValue = status ? (
+    selectedQRType === 'external' && status.external_url ? status.external_url :
+    selectedQRType === 'hostname' ? status.hostname_url :
+    status.local_url
+  ) : '';
 
   return (
     <div className="server-panel">
@@ -315,61 +323,104 @@ export default function ServerPanel() {
         <div className="sp-section sp-server-info">
           <h3>📡 Server Info</h3>
 
-          <div className="sp-info-grid">
-            <div className="sp-info-item">
-              <span className="sp-info-label">Local URL</span>
-              <span className="sp-info-value sp-url" onClick={() => copyToClipboard(status.local_url)}>
-                {status.local_url} 📋
-              </span>
-            </div>
-            <div className="sp-info-item">
-              <span className="sp-info-label">Hostname</span>
-              <span className="sp-info-value sp-url" onClick={() => copyToClipboard(status.hostname_url)}>
-                {status.hostname_url} 📋
-              </span>
-            </div>
-            {status.external_url && (
-              <div className="sp-info-item sp-upnp-info">
-                <span className="sp-info-label">External URL (UPnP)</span>
-                <span className="sp-info-value sp-url" onClick={() => copyToClipboard(status.external_url!)}>
-                  {status.external_url} 📋
+          <div className="sp-server-info-layout">
+            <div className="sp-info-grid">
+              <div className="sp-info-item">
+                <span className="sp-info-label">Local URL</span>
+                <span className="sp-info-value sp-url" onClick={() => copyToClipboard(status.local_url)} title="Copy URL">
+                  <span className="sp-url-text">{status.local_url}</span>
+                  <span className="sp-copy-icon">📋</span>
                 </span>
               </div>
-            )}
-            
-            <div className="sp-info-item mt-2 pt-2 border-t border-border">
-              <span className="sp-info-label">Storage Usage</span>
-              <div className="flex flex-col items-end">
-                <span className="sp-info-value text-accent font-bold">
-                  {formatBytes(status.disk_total - status.disk_free)} / {formatBytes(status.disk_total)}
+              <div className="sp-info-item">
+                <span className="sp-info-label">Hostname</span>
+                <span className="sp-info-value sp-url" onClick={() => copyToClipboard(status.hostname_url)} title="Copy URL">
+                  <span className="sp-url-text">{status.hostname_url}</span>
+                  <span className="sp-copy-icon">📋</span>
                 </span>
-                <span className="text-[10px] text-text-muted">
-                  {formatBytes(status.disk_free)} free space
-                </span>
+              </div>
+              {status.external_url && (
+                <div className="sp-info-item sp-upnp-info">
+                  <span className="sp-info-label">External URL (UPnP)</span>
+                  <span className="sp-info-value sp-url" onClick={() => copyToClipboard(status.external_url!)} title="Copy URL">
+                    <span className="sp-url-text">{status.external_url}</span>
+                    <span className="sp-copy-icon">📋</span>
+                  </span>
+                </div>
+              )}
+              
+              <div className="sp-info-item sp-storage-item">
+                <span className="sp-info-label">Storage Usage</span>
+                <div className="sp-storage-container">
+                  <span className="sp-storage-value">
+                    {formatBytes(status.disk_total - status.disk_free)} / {formatBytes(status.disk_total)}
+                  </span>
+                  <span className="sp-storage-free">
+                    {formatBytes(status.disk_free)} free space
+                  </span>
+                </div>
+              </div>
+
+              <div className="sp-info-item">
+                <span className="sp-info-label">Live Traffic</span>
+                <div className="sp-traffic-container">
+                  <div className="sp-traffic-sent">
+                    <span>↑ {formatBytes(status.bytes_sent)}</span>
+                    <span className="sp-traffic-speed">({formatBytes(speed.sent)}/s)</span>
+                  </div>
+                  <div className="sp-traffic-recv">
+                    <span>↓ {formatBytes(status.bytes_received)}</span>
+                    <span className="sp-traffic-speed">({formatBytes(speed.recv)}/s)</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="sp-info-item">
-              <span className="sp-info-label">Live Traffic</span>
-              <div className="flex flex-col items-end gap-1 text-xs font-mono">
-                <div className="text-emerald-400 flex gap-2">
-                  <span>↑ {formatBytes(status.bytes_sent)}</span>
-                  <span className="opacity-70">({formatBytes(speed.sent)}/s)</span>
-                </div>
-                <div className="text-blue-400 flex gap-2">
-                  <span>↓ {formatBytes(status.bytes_received)}</span>
-                  <span className="opacity-70">({formatBytes(speed.recv)}/s)</span>
-                </div>
+            {/* Premium Dynamic QR Code Card Section */}
+            <div className="sp-qr-section">
+              <span className="sp-qr-header-label">📱 Scan QR to Connect</span>
+              <div className="sp-qr-tabs">
+                <button
+                  className={`sp-qr-tab-btn ${selectedQRType === 'local' ? 'active' : ''}`}
+                  onClick={() => setSelectedQRType('local')}
+                >
+                  Local IP
+                </button>
+                <button
+                  className={`sp-qr-tab-btn ${selectedQRType === 'hostname' ? 'active' : ''}`}
+                  onClick={() => setSelectedQRType('hostname')}
+                >
+                  Hostname
+                </button>
+                {status.external_url && (
+                  <button
+                    className={`sp-qr-tab-btn ${selectedQRType === 'external' ? 'active' : ''}`}
+                    onClick={() => setSelectedQRType('external')}
+                  >
+                    UPnP External
+                  </button>
+                )}
+              </div>
+
+              <div className="sp-qr-card">
+                <QRCodeSVG value={qrValue} size={150} marginSize={2} />
+              </div>
+
+              <div className="sp-qr-url-badge" onClick={() => copyToClipboard(qrValue)} title="Copy URL">
+                <span className="sp-qr-url-text">{qrValue}</span>
+                <span className="sp-qr-copy-icon">📋</span>
               </div>
             </div>
           </div>
 
           {/* Quick QR hint */}
           <div className="sp-hint">
-            💡 Open <strong>{status.local_url}</strong> on any device's browser on the same WiFi to access files
+            💡 Scan the QR Code or open <strong>{qrValue}</strong> in any network device's browser to browse, send, and receive files instantly!
           </div>
         </div>
       )}
+
+
 
       {/* Device Discovery */}
       <div className="sp-section">
