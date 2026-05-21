@@ -23,3 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 release/
+
+# AI Summaries & Task Trackers
+*SUMMARY.md
+*summary.md
+ci_permission_fix_summary.md
+
