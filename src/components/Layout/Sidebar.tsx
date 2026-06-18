@@ -12,6 +12,8 @@ interface DriveInfo {
   path: string;
   label: string;
   drive_type: string;
+  total_space: number;
+  free_space: number;
 }
 
 interface NavItem {

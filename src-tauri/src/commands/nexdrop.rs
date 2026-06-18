@@ -308,8 +308,13 @@ fn handle_file_receive(
     // Emit incoming transfer notification
     let _ = app.emit("file-transfer-incoming", info.clone());
     
-    // Create save path
-    let file_path = Path::new(save_dir).join(&info.file_name);
+    // Security: sanitize file_name to prevent path traversal (e.g. "../../evil.exe")
+    // Only use the basename — strip any directory components from the sender's file_name.
+    let safe_name = Path::new(&info.file_name)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "received_file".to_string());
+    let file_path = Path::new(save_dir).join(&safe_name);
     let mut file = fs::File::create(&file_path)
         .map_err(|e| format!("Failed to create file: {}", e))?;
     

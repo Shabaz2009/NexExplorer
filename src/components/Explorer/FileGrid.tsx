@@ -4,6 +4,7 @@ import { useFileSystem, FileEntry } from '../../hooks/useFileSystem';
 import { useExplorerStore } from '../../store/explorerStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useContextMenu } from '../../hooks/useContextMenu';
+import { useSettingsStore } from '../../store/settingsStore';
 import ContextMenu from './ContextMenu';
 import { VirtualizedGrid } from '../UI/VirtualizedContainer';
 
@@ -84,14 +85,33 @@ const FileGrid: React.FC = () => {
   const [marquee, setMarquee] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const handleDoubleClick = (entry: FileEntry) => {
+  // When doubleClickToOpen is false, single-click navigates into directories
+  // (like macOS Finder single-click mode). Files always need double-click.
+  const doubleClickToOpen = useSettingsStore(s => s.doubleClickToOpen);
+
+  const handleDoubleClick = async (entry: FileEntry) => {
     if (entry.is_dir) {
       setCurrentPath(entry.path);
+    } else {
+      // Open files with the OS default application (like Windows Explorer)
+      try {
+        const { openPath } = await import('@tauri-apps/plugin-opener');
+        await openPath(entry.path);
+      } catch (err) {
+        console.error('Failed to open file:', err);
+      }
     }
   };
 
   const handleSelect = (e: React.MouseEvent, file: FileEntry, index: number) => {
     e.stopPropagation();
+
+    // Single-click-to-open directories when setting is disabled
+    if (!doubleClickToOpen && file.is_dir && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      setCurrentPath(file.path);
+      return;
+    }
+
     if (e.shiftKey && lastSelectedIndex !== null) {
       const start = Math.min(lastSelectedIndex, index);
       const end = Math.max(lastSelectedIndex, index);

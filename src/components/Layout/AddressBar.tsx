@@ -22,7 +22,7 @@ const AddressBar: React.FC = () => {
   };
 
   const segments = currentPath.split('\\').filter(Boolean);
-  
+
   const navigateToSegment = (index: number) => {
     const isDrive = index === 0 && segments[0].endsWith(':');
     const newPath = segments.slice(0, index + 1).join('\\') + (isDrive ? '\\' : '');
@@ -30,14 +30,14 @@ const AddressBar: React.FC = () => {
   };
 
   return (
-    <div 
+    <div
       className="flex-1 flex items-center h-8 bg-bg-primary/40 backdrop-blur-sm border border-border/50 rounded-lg hover:border-accent/40 transition-all cursor-text group overflow-hidden shadow-inner"
       onClick={() => {
         if (!isEditing) setIsEditing(true);
       }}
     >
       {isEditing ? (
-        <input 
+        <input
           autoFocus
           className="w-full h-full bg-transparent outline-none px-3 text-[13px] text-text-primary font-medium"
           value={inputValue}
@@ -50,7 +50,7 @@ const AddressBar: React.FC = () => {
           <div className="flex items-center gap-0.5 min-w-max">
             {segments.map((segment, index) => (
               <React.Fragment key={index}>
-                <button 
+                <button
                   className="px-2 py-1 rounded-md hover:bg-white/10 interactive truncate max-w-[200px] text-text-secondary hover:text-text-primary"
                   onClick={(e) => {
                     e.stopPropagation();

@@ -6,7 +6,8 @@ import { Wifi, Send, Smartphone, Monitor, Laptop, Tablet, RefreshCw, Shield, Glo
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import ServerPanel from '../LocalShare/ServerPanel';
-import { useLocalShareStore, TrustedDevice } from '../../store/localShareStore';
+import InputDialog from '../Dialogs/InputDialog';
+import { useNexDropStore, TrustedDevice } from '../../store/nexDropStore';
 import { useExplorerStore } from '../../store/explorerStore';
 
 interface Device {
@@ -57,8 +58,9 @@ const LocalSharePanel: React.FC = () => {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [showQR, setShowQR] = useState(false);
   const [defaultUsbPath, setDefaultUsbPath] = useState<string>('');
+  const [showIpDialog, setShowIpDialog] = useState(false);
 
-  const { trustedDevices, addTrustedDevice } = useLocalShareStore();
+  const { trustedDevices, addTrustedDevice } = useNexDropStore();
   const { navigateTo } = useExplorerStore();
 
   useEffect(() => {
@@ -207,13 +209,15 @@ const LocalSharePanel: React.FC = () => {
   };
 
   const browseDevice = (device: Device | TrustedDevice) => {
-    // Assuming the remote device is running the NexExplorer LAN server on port 8080
-    navigateTo(`http://${device.ip}:8080`);
+    // Use the device's actual port instead of a hardcoded value
+    const port = device.port || 8080;
+    navigateTo(`http://${device.ip}:${port}`);
   };
 
   // const localIP = devices.length > 0 ? "192.168.x.x" : "Not connected"; // Ideally fetch from Tauri command get_local_ip
 
   return (
+    <>
     <div className="w-full h-full flex flex-col items-center justify-start p-10 overflow-y-auto custom-scrollbar bg-bg-primary/50">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -288,12 +292,7 @@ const LocalSharePanel: React.FC = () => {
                   </h3>
                   <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => {
-                        const ip = prompt('Enter manual IP:');
-                        if (ip) {
-                          sendToDevice({ ip, port: 53317, alias: 'Manual Device', fingerprint: '', version: '2.1', https: false, device_type: 'desktop', device_model: '', download: true });
-                        }
-                      }}
+                      onClick={() => setShowIpDialog(true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-bg-tertiary hover:bg-bg-hover text-text-primary border border-border/50 interactive transition-all"
                     >
                       <Globe size={12} />
@@ -571,6 +570,19 @@ const LocalSharePanel: React.FC = () => {
         </AnimatePresence>
       </motion.div>
     </div>
+
+    {/* Manual IP Input Dialog — replaces blocking prompt() */}
+    <InputDialog
+      isOpen={showIpDialog}
+      title="Enter Device IP Address"
+      placeholder="192.168.1.100"
+      onConfirm={(ip) => {
+        setShowIpDialog(false);
+        sendToDevice({ ip, port: 53317, alias: 'Manual Device', fingerprint: '', version: '2.1', https: false, device_type: 'desktop', device_model: '', download: true });
+      }}
+      onCancel={() => setShowIpDialog(false)}
+    />
+    </>
   );
 };
 

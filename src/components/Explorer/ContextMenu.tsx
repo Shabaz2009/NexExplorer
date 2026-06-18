@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { Package, Archive, Unlock, Lock, KeyRound, BarChart3, Search, Send } from 'lucide-react';
 import PropertiesDialog from './PropertiesDialog';
 import HashChecker from '../Dialogs/HashChecker';
 import DiskAnalyzer from '../Tools/DiskAnalyzer';
@@ -64,20 +65,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
     onClose();
   };
 
+  // B7 fix: always route through handleTrash (recycle bin), never invoke
+  // delete_file directly. handleTrash already handles multi-selection.
   const handleDelete = async () => {
-    if (isMulti) {
-      handleVerb('delete');
-      return;
-    }
-    if (filePath) {
-      try {
-        await invoke('delete_file', { path: filePath });
-        handleVerb('delete');
-      } catch (e) {
-        console.error('Delete failed:', e);
-      }
-    }
-    onClose();
+    handleVerb('delete');
   };
 
   const handleExtract = async () => {
@@ -153,7 +144,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
   }
 
   return (
-    <div 
+    <div
       className="fixed z-50 bg-bg-secondary/95 backdrop-blur-lg border border-border rounded-xl shadow-2xl py-1 w-64 text-sm text-text-primary overflow-hidden"
       style={{ left: position.x, top: position.y }}
       onClick={(e) => e.stopPropagation()}
@@ -166,7 +157,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
             </div>
           ) : (
             <>
-              <button 
+              <button
                 onClick={() => handleVerb('open')}
                 className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group font-bold"
               >
@@ -176,108 +167,108 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
               <div className="h-px bg-border my-1"></div>
             </>
           )}
-          
+
           {!isMulti && isArchive ? (
-            <button 
+            <button
               onClick={handleExtract}
               className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
             >
-              <span>📦 Extract Here</span>
+              <span className="flex items-center gap-2"><Package size={14} /> Extract Here</span>
               <span className="text-text-muted group-hover:text-accent-text opacity-70 text-[10px] font-mono">7Z</span>
             </button>
           ) : !isMulti && (
             <>
-              <button 
+              <button
                 onClick={() => handleCompress('.zip')}
                 className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
               >
-                <span>🗜️ Compress to .zip</span>
+                <span className="flex items-center gap-2"><Archive size={14} /> Compress to .zip</span>
                 <span className="text-text-muted group-hover:text-accent-text opacity-70 text-[10px] font-mono">ZIP</span>
               </button>
-              <button 
+              <button
                 onClick={() => handleCompress('.7z')}
                 className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
               >
-                <span>🗜️ Compress to .7z</span>
+                <span className="flex items-center gap-2"><Archive size={14} /> Compress to .7z</span>
                 <span className="text-text-muted group-hover:text-accent-text opacity-70 text-[10px] font-mono">7Z</span>
               </button>
             </>
           )}
 
           {!isMulti && <div className="h-px bg-border/50 my-1 mx-2"></div>}
-          
+
           {!isMulti && (isLockedFile ? (
-            <button 
+            <button
               onClick={handleUnlock}
               className="w-full px-4 py-2 text-left hover:bg-success hover:text-white flex justify-between items-center group text-success"
             >
-              <span className="font-semibold">🔓 Unlock & Unhide</span>
+              <span className="font-semibold flex items-center gap-2"><Unlock size={14} /> Unlock & Unhide</span>
             </button>
           ) : (
-            <button 
+            <button
               onClick={handleHideLock}
               className="w-full px-4 py-2 text-left hover:bg-amber-500 hover:text-white flex justify-between items-center group text-amber-500"
             >
-              <span className="font-semibold">🔒 Secure Hide & Lock</span>
+              <span className="font-semibold flex items-center gap-2"><Lock size={14} /> Secure Hide & Lock</span>
             </button>
           ))}
 
           {!isMulti && <div className="h-px bg-border my-1"></div>}
 
           {!isMulti && !isDir && (
-            <button 
+            <button
               onClick={() => { onClose(); setShowHashChecker(true); }}
               className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
             >
-              <span>🔐 Check Hash</span>
+              <span className="flex items-center gap-2"><KeyRound size={14} /> Check Hash</span>
             </button>
           )}
 
           {!isMulti && isDir && (
             <>
-              <button 
+              <button
                 onClick={() => { onClose(); setShowDiskAnalyzer(true); }}
                 className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
               >
-                <span>📊 Analyze Space</span>
+                <span className="flex items-center gap-2"><BarChart3 size={14} /> Analyze Space</span>
               </button>
-              <button 
+              <button
                 onClick={() => { onClose(); setShowDuplicateFinder(true); }}
                 className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
               >
-                <span>🔍 Find Duplicates</span>
+                <span className="flex items-center gap-2"><Search size={14} /> Find Duplicates</span>
               </button>
             </>
           )}
-          
+
           <div className="h-px bg-border my-1"></div>
-          <button 
+          <button
             onClick={handleNexDropSend}
             className="w-full px-4 py-2 text-left bg-accent/10 hover:bg-accent hover:text-accent-text text-accent font-semibold transition-colors"
           >
-            📤 Send via NexDrop
+            <span className="flex items-center gap-2"><Send size={14} /> Send via NexDrop</span>
           </button>
-          
+
           <div className="h-px bg-border my-1"></div>
-          <button 
+          <button
             onClick={() => handleVerb('cut')}
             className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
           >
             <span>Cut</span>
             <span className="text-text-muted group-hover:text-accent-text opacity-70 text-[10px] tracking-wider uppercase">Ctrl+X</span>
           </button>
-          <button 
+          <button
             onClick={() => handleVerb('copy')}
             className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
           >
             <span>Copy</span>
             <span className="text-text-muted group-hover:text-accent-text opacity-70 text-[10px] tracking-wider uppercase">Ctrl+C</span>
           </button>
-          
+
           <div className="h-px bg-border my-1"></div>
-          
+
           {isMulti ? (
-            <button 
+            <button
               onClick={() => { onClose(); setShowBatchRenamer(true); }}
               className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group font-semibold text-accent"
             >
@@ -285,7 +276,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
               <span className="text-text-muted group-hover:text-accent-text opacity-70 text-[10px] tracking-wider uppercase">Alt+R</span>
             </button>
           ) : (
-            <button 
+            <button
               onClick={() => handleVerb('rename')}
               className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
             >
@@ -294,16 +285,16 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
             </button>
           )}
 
-          <button 
+          <button
             onClick={handleDelete}
             className="w-full px-4 py-2 text-left hover:bg-error hover:text-white flex justify-between items-center group text-error transition-colors"
           >
             <span className="font-semibold">Delete</span>
             <span className="text-text-muted group-hover:text-white opacity-70 text-[10px] tracking-wider uppercase">Del</span>
           </button>
-          
+
           <div className="h-px bg-border my-1"></div>
-          <button 
+          <button
             onClick={() => { onClose(); setShowProperties(true); }}
             className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
           >
@@ -313,10 +304,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
         </>
       ) : (
         <>
-          <button onClick={() => { onClose(); setShowDiskAnalyzer(true); }} className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text">📊 Analyze Disk Space</button>
-          <button onClick={() => { onClose(); setShowDuplicateFinder(true); }} className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text">🔍 Find Duplicates</button>
+          <button onClick={() => { onClose(); setShowDiskAnalyzer(true); }} className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex items-center gap-2"><BarChart3 size={14} /> Analyze Disk Space</button>
+          <button onClick={() => { onClose(); setShowDuplicateFinder(true); }} className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex items-center gap-2"><Search size={14} /> Find Duplicates</button>
           <div className="h-px bg-border my-1"></div>
-          <button 
+          <button
             onClick={() => handleVerb('refresh')}
             className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
           >
@@ -324,7 +315,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, target, onC
             <span className="text-text-muted group-hover:text-accent-text opacity-70 text-[10px] tracking-wider uppercase">F5</span>
           </button>
           <div className="h-px bg-border my-1"></div>
-          <button 
+          <button
             onClick={() => handleVerb('paste')}
             className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-text flex justify-between items-center group"
           >

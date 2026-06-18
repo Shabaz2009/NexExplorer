@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::{Read, BufReader};
 use std::path::{Path, PathBuf};
 use sha2::{Sha256, Digest};
 use md5;
@@ -53,17 +54,24 @@ pub async fn recursive_search(path: String, query: String) -> Result<Vec<super::
 
 #[tauri::command]
 pub async fn calculate_file_hashes(path: String) -> Result<FileHashes, String> {
-    let content = fs::read(&path).map_err(|e| e.to_string())?;
-    
-    let md5_hash = format!("{:x}", md5::compute(&content));
-    
-    let mut hasher = Sha256::new();
-    hasher.update(&content);
-    let sha256_hash = hex::encode(hasher.finalize());
-    
+    // Stream file in 8KB chunks to avoid loading the entire file into memory.
+    // A 4GB file previously allocated 4GB of RAM here — now uses ~8KB.
+    let file = fs::File::open(&path).map_err(|e| e.to_string())?;
+    let mut reader = BufReader::new(file);
+    let mut md5_ctx = md5::Context::new();
+    let mut sha256_hasher = Sha256::new();
+    let mut buf = [0u8; 8192];
+
+    loop {
+        let n = reader.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 { break; }
+        md5_ctx.consume(&buf[..n]);
+        sha256_hasher.update(&buf[..n]);
+    }
+
     Ok(FileHashes {
-        md5: md5_hash,
-        sha256: sha256_hash,
+        md5: format!("{:x}", md5_ctx.compute()),
+        sha256: hex::encode(sha256_hasher.finalize()),
     })
 }
 
@@ -162,12 +170,27 @@ pub async fn find_duplicates(path: String) -> Result<Vec<DuplicateGroup>, String
     for (size, paths) in size_groups {
         if paths.len() > 1 {
             for p in paths {
-                if let Ok(content) = fs::read(&p) {
+                // Stream file in 8KB chunks instead of loading entire file into RAM.
+                // Previously fs::read(&p) would OOM on large files.
+                if let Ok(file) = fs::File::open(&p) {
+                    let mut reader = BufReader::new(file);
                     let mut hasher = Sha256::new();
-                    hasher.update(&content);
+                    let mut buf = [0u8; 8192];
+                    let mut ok = true;
+                    loop {
+                        match reader.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(n) => hasher.update(&buf[..n]),
+                            Err(_) => { ok = false; break; }
+                        }
+                    }
+                    if !ok { continue; }
                     let hash = hex::encode(hasher.finalize());
                     
-                    let meta = fs::metadata(&p).unwrap();
+                    let meta = match fs::metadata(&p) {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
                     let created = meta.created().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs());
                     let modified = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs());
                     let accessed = meta.accessed().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs());

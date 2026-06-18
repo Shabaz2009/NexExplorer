@@ -309,7 +309,12 @@ pub async fn upload_handler(
             .await
             .map_err(|e| (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": e.to_string() }))))?;
 
-        let dest = state.share_path.join(&filename);
+        // Security: sanitize filename to prevent path traversal (e.g. "../../evil.exe")
+        let safe_filename = std::path::Path::new(&filename)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "uploaded_file".to_string());
+        let dest = state.share_path.join(&safe_filename);
         tokio::fs::write(&dest, &data)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
@@ -379,9 +384,21 @@ pub async fn mkdir_handler(
     }
 
     let full_path = state.share_path.join(path).join(name);
+
+    // Security: verify new directory stays within the share root
+    // We create the dir first, then canonicalize to check containment
     tokio::fs::create_dir_all(&full_path)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let canonical = full_path.canonicalize()
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Path error" }))))?;
+    let canonical_root = state.share_path.canonicalize()
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Internal error" }))))?;
+    if !canonical.starts_with(&canonical_root) {
+        // Undo the directory creation if it escaped the share root
+        let _ = tokio::fs::remove_dir(&canonical).await;
+        return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Access denied" }))));
+    }
 
     Ok(Json(serde_json::json!({ "created": name })))
 }
@@ -403,6 +420,25 @@ pub async fn rename_handler(
 
     let from_path = state.share_path.join(from);
     let to_path = state.share_path.join(to);
+
+    // Security: verify both paths stay within the share root
+    let canonical_from = from_path.canonicalize()
+        .map_err(|_| (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Source not found" }))))?;
+    let canonical_root = state.share_path.canonicalize()
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Internal error" }))))?;
+    if !canonical_from.starts_with(&canonical_root) {
+        return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Access denied" }))));
+    }
+    // For destination, check parent exists and is within root
+    if let Some(to_parent) = to_path.parent() {
+        if to_parent.exists() {
+            let canonical_to_parent = to_parent.canonicalize()
+                .map_err(|_| (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Invalid destination" }))))?;
+            if !canonical_to_parent.starts_with(&canonical_root) {
+                return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Access denied" }))));
+            }
+        }
+    }
 
     tokio::fs::rename(&from_path, &to_path)
         .await

@@ -26,7 +26,7 @@ function getUniqueFileName(dir, fileName) {
     name = fileName.substring(0, extIndex);
     ext = fileName.substring(extIndex);
   }
-  
+
   let counter = 0;
   let currentName = fileName;
   let currentPath = path.join(dir, currentName);
@@ -73,11 +73,11 @@ function startLocalSendServer(win) {
           const sessionId = Date.now().toString();
           const token = Math.random().toString(36).substring(2, 15);
           const savePath = config.saveDirectory || app.getPath('downloads');
-          
+
           const sessionFiles = {};
           let isText = false;
           let textPreview = '';
-          
+
           for (const [key, fileDef] of Object.entries(data.files)) {
             if (fileDef.fileType === 'text') {
               isText = true;
@@ -85,7 +85,7 @@ function startLocalSendServer(win) {
             }
             let safeName = path.basename(fileDef.fileName || 'file').replace(/[^a-zA-Z0-9.\-_ ]/g, '_');
             safeName = getUniqueFileName(savePath, safeName);
-            
+
             sessionFiles[key] = {
               ...fileDef,
               safeFileName: safeName
@@ -103,10 +103,10 @@ function startLocalSendServer(win) {
           if (mainWindow) {
             mainWindow.webContents.send('nex:event', {
               event: 'receive-request',
-              payload: { 
-                sessionId, 
-                device: data.info.alias, 
-                files: data.files, 
+              payload: {
+                sessionId,
+                device: data.info.alias,
+                files: data.files,
                 autoAccept: config.autoAccept,
                 isText,
                 textPreview
@@ -157,7 +157,7 @@ function startLocalSendServer(win) {
 
       const destPath = path.join(session.savePath, fileInfo.safeFileName);
       const partPath = destPath + '.part';
-      
+
       const writeStream = fs.createWriteStream(partPath, { flags: offset > 0 ? 'a' : 'w' });
       req.pipe(writeStream);
 
@@ -194,7 +194,7 @@ function startLocalSendServer(win) {
         for (const fileDef of Object.values(session.files)) {
           const partPath = path.join(session.savePath, fileDef.safeFileName + '.part');
           if (fs.existsSync(partPath)) {
-            try { fs.unlinkSync(partPath); } catch (e) {}
+            try { fs.unlinkSync(partPath); } catch (e) { }
           }
         }
       }
@@ -228,7 +228,7 @@ function acceptSession(sessionId) {
   const resumeOffsets = {};
   for (const [key, fileDef] of Object.entries(session.files)) {
     fileMap[key] = session.token;
-    
+
     if (fileDef.fileType !== 'text') {
       const partPath = path.join(session.savePath, fileDef.safeFileName + '.part');
       if (fs.existsSync(partPath)) {
@@ -239,7 +239,7 @@ function acceptSession(sessionId) {
           } else {
             fs.unlinkSync(partPath);
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   }

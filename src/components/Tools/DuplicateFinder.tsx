@@ -35,17 +35,24 @@ const DuplicateFinder: React.FC<{ initialPath: string, onClose: () => void }> = 
     setSelectedToDelete(next);
   };
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   const deleteSelected = async () => {
-    if (confirm(`Are you sure you want to delete ${selectedToDelete.size} duplicate files?`)) {
-      for (const path of selectedToDelete) {
-        try {
-          await invoke('delete_file', { path });
-        } catch (e) {
-          console.error(`Failed to delete ${path}:`, e);
-        }
-      }
-      onClose();
+    // B8 fix: route through trash_items (recycle bin) instead of delete_file.
+    // B4 fix: use state-driven confirmation instead of blocking confirm().
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
     }
+    setConfirmingDelete(false);
+    for (const path of selectedToDelete) {
+      try {
+        await invoke('trash_items', { paths: [path] });
+      } catch (e) {
+        console.error(`Failed to trash ${path}:`, e);
+      }
+    }
+    onClose();
   };
 
   if (loading) {
@@ -146,17 +153,29 @@ const DuplicateFinder: React.FC<{ initialPath: string, onClose: () => void }> = 
           >
             Cancel
           </button>
+          {confirmingDelete && (
+            <button
+              onClick={() => setConfirmingDelete(false)}
+              className="px-4 py-2 hover:bg-bg-hover rounded-xl text-xs font-bold text-text-secondary transition-all"
+            >
+              Never mind
+            </button>
+          )}
           <button 
             disabled={selectedToDelete.size === 0}
             onClick={deleteSelected}
             className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-lg ${
               selectedToDelete.size > 0 
-                ? 'bg-error text-white hover:bg-red-600 shadow-error/20' 
+                ? confirmingDelete
+                  ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30 animate-pulse'
+                  : 'bg-error text-white hover:bg-red-600 shadow-error/20'
                 : 'bg-bg-tertiary text-text-muted cursor-not-allowed opacity-50'
             }`}
           >
             <Trash2 size={14} />
-            Delete {selectedToDelete.size} Files
+            {confirmingDelete
+              ? `Confirm Trash ${selectedToDelete.size} Files?`
+              : `Delete ${selectedToDelete.size} Files`}
           </button>
         </div>
       </div>

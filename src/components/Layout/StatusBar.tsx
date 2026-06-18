@@ -1,12 +1,22 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useFileSystem } from '../../hooks/useFileSystem';
 import { useSelectionStore } from '../../store/selectionStore';
+import { useExplorerStore } from '../../store/explorerStore';
 import { formatBytes } from '../../utils/formatters';
 import ViewToggle from '../Explorer/ViewToggle';
+
+interface DriveSpace {
+  path: string;
+  free_space: number;
+  total_space: number;
+}
 
 const StatusBar: React.FC = () => {
   const { files } = useFileSystem();
   const { selectedPaths } = useSelectionStore();
+  const { currentPath } = useExplorerStore();
+  const [driveSpace, setDriveSpace] = useState<DriveSpace | null>(null);
 
   // Optimized size calculation using a Map lookup
   const selectedSize = React.useMemo(() => {
@@ -15,8 +25,27 @@ const StatusBar: React.FC = () => {
     return Array.from(selectedPaths).reduce((acc, path) => acc + (fileMap.get(path) || 0), 0);
   }, [files, selectedPaths]);
 
-  // Note: in a real implementation we would fetch drive space from rust
-  // For now we will mock it or leave it generic
+  // Fetch real disk space for the current drive
+  useEffect(() => {
+    // Only fetch for real filesystem paths, not virtual routes
+    if (currentPath.startsWith('nexdrop://') || currentPath.startsWith('localshare://') || currentPath.startsWith('http')) {
+      setDriveSpace(null);
+      return;
+    }
+    (async () => {
+      try {
+        const drives = await invoke<{ path: string; free_space: number; total_space: number }[]>('get_drives');
+        // Find the drive that matches the current path's root (e.g. "C:\\")
+        const driveLetter = currentPath.substring(0, 3).toUpperCase(); // "C:\\"
+        const match = drives.find(d => d.path.toUpperCase() === driveLetter);
+        if (match) {
+          setDriveSpace({ path: match.path, free_space: match.free_space, total_space: match.total_space });
+        }
+      } catch {
+        // Silently fail — StatusBar is non-critical
+      }
+    })();
+  }, [currentPath]);
 
   return (
     <div className="h-6 bg-bg-secondary border-t border-border flex items-center px-3 text-[11px] text-text-secondary select-none">
@@ -32,7 +61,9 @@ const StatusBar: React.FC = () => {
         )}
       </div>
       <div className="flex gap-4 items-center">
-        <span>Disk: 256 GB free</span>
+        {driveSpace && driveSpace.free_space > 0 && (
+          <span>Disk: {formatBytes(driveSpace.free_space)} free</span>
+        )}
         <ViewToggle />
       </div>
     </div>

@@ -118,7 +118,18 @@ const FileDetails: React.FC = () => {
               isSelected={selectedPaths.has(file.path)}
               folderSize={folderSizes[file.path]}
               isCalculating={calculating.has(file.path)}
-              onDoubleClick={(f) => f.is_dir && setCurrentPath(f.path)}
+              onDoubleClick={async (f) => {
+                if (f.is_dir) {
+                  setCurrentPath(f.path);
+                } else {
+                  try {
+                    const { openPath } = await import('@tauri-apps/plugin-opener');
+                    await openPath(f.path);
+                  } catch (err) {
+                    console.error('Failed to open file:', err);
+                  }
+                }
+              }}
               onClick={(e, f) => toggleSelection(f.path, e.ctrlKey || e.metaKey)}
             />
           )}

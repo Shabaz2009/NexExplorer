@@ -29,3 +29,6 @@ release/
 *summary.md
 ci_permission_fix_summary.md
 
+# Claude Code - Local settings with API keys
+.claude/settings.local.json
+

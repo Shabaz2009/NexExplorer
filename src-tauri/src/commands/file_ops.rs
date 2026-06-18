@@ -382,8 +382,12 @@ fn find_7z_binary() -> Result<String, String> {
 fn parse_7z_list_output(output: &str, archive_path: &str) -> Result<Vec<FileEntry>, String> {
     let mut entries: Vec<FileEntry> = Vec::new();
     
-    // Split by double-newline to get blocks
-    let blocks: Vec<&str> = output.split("\n\n").collect();
+    // Split by double-newline to get blocks.
+    // B27 fix: 7z on Windows emits "\r\n" line endings, so a literal "\n\n"
+    // split never matches and the whole output is treated as one block.
+    // Normalize "\r\n" -> "\n" first, then split.
+    let normalized = output.replace("\r\n", "\n");
+    let blocks: Vec<&str> = normalized.split("\n\n").collect();
     
     for block in blocks {
         let mut name = String::new();
@@ -633,17 +637,26 @@ pub async fn get_drives() -> Result<Vec<DriveInfo>, String> {
     
     #[cfg(target_os = "windows")]
     {
+        // B29 fix: previously total_space/free_space were hardcoded to 0.
+        // Use sysinfo (already a dependency) to read real disk capacity/free
+        // space. We refresh once and build a lookup by mount path.
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        let mut space_by_path: std::collections::HashMap<String, (u64, u64)> =
+            std::collections::HashMap::new();
+        for disk in disks.list() {
+            let mount = disk.mount_point().to_string_lossy().to_string();
+            space_by_path.insert(mount, (disk.total_space(), disk.available_space()));
+        }
+
         // Check drive letters A-Z
         for letter in b'A'..=b'Z' {
             let drive_path = format!("{}:\\", letter as char);
             let p = Path::new(&drive_path);
             if p.exists() {
-                let total_space: u64 = 0;
-                let free_space: u64 = 0;
-                
-                // Try to get disk space using fs metadata
                 let drive_type = get_windows_drive_type(&drive_path);
-                
+                let (total_space, free_space) =
+                    space_by_path.get(&drive_path).copied().unwrap_or((0, 0));
+
                 drives.push(DriveInfo {
                     letter: format!("{}", letter as char),
                     path: drive_path,
@@ -655,17 +668,25 @@ pub async fn get_drives() -> Result<Vec<DriveInfo>, String> {
             }
         }
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
-        // On Unix, list mount points
+        // B29 fix (Unix): read real total/free space for the root mount.
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        let (total_space, free_space) = disks
+            .list()
+            .iter()
+            .find(|d| d.mount_point().to_string_lossy() == "/")
+            .map(|d| (d.total_space(), d.available_space()))
+            .unwrap_or((0, 0));
+
         drives.push(DriveInfo {
             letter: "/".to_string(),
             path: "/".to_string(),
             label: "Root".to_string(),
             drive_type: "fixed".to_string(),
-            total_space: 0,
-            free_space: 0,
+            total_space,
+            free_space,
         });
     }
     

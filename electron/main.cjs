@@ -168,7 +168,7 @@ function isHiddenEntry(entryPath, name) {
 
 async function readDir(dirPath) {
   const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true });
-  
+
   const entries = [];
   const BATCH_SIZE = 50; // Limit concurrent fs.stat calls for low-end device RAM optimization
 
@@ -203,19 +203,19 @@ function copyFileWithProgress(source, dest, onProgress) {
   return new Promise((resolve, reject) => {
     fs.stat(source, (err, stats) => {
       if (err) return reject(err);
-      
+
       const totalBytes = stats.size;
       let copiedBytes = 0;
       let lastReportTime = Date.now();
       let lastReportBytes = 0;
       const startTime = Date.now();
-      
+
       const readStream = fs.createReadStream(source);
       const writeStream = fs.createWriteStream(dest);
-      
+
       readStream.on('error', reject);
       writeStream.on('error', reject);
-      
+
       readStream.on('data', (chunk) => {
         copiedBytes += chunk.length;
         const now = Date.now();
@@ -229,7 +229,7 @@ function copyFileWithProgress(source, dest, onProgress) {
           lastReportBytes = copiedBytes;
         }
       });
-      
+
       writeStream.on('finish', () => resolve());
       readStream.pipe(writeStream);
     });
@@ -378,7 +378,7 @@ async function sendLocalShareFiles(targets, filePaths) {
   }
 
   const sourceFiles = [];
-  
+
   async function addFilesRecursively(targetPath, rootDir = '') {
     const stats = await fs.promises.stat(targetPath);
     if (stats.isDirectory()) {
@@ -462,7 +462,7 @@ async function sendLocalShareFiles(targets, filePaths) {
         await new Promise((resolveUpload, rejectUpload) => {
           const reqModule = target.https ? require('node:https') : require('node:http');
           const parsedUrl = new URL(uploadUrl);
-          
+
           const req = reqModule.request(parsedUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/octet-stream' }
@@ -473,9 +473,9 @@ async function sendLocalShareFiles(targets, filePaths) {
               rejectUpload(new Error(`Upload failed for ${payload.fileName} (${res.statusCode})`));
             }
           });
-          
+
           req.on('error', rejectUpload);
-          
+
           const readStream = fs.createReadStream(payload.path, { start: offset });
           readStream.pipe(req);
         });
@@ -611,8 +611,8 @@ function registerIpcHandlers() {
           const fileName = path.basename(source);
           await moveRecursiveFallback(source, path.join(destDir, fileName), (prog) => {
             mainWindow?.webContents.send('nex:event', {
-               event: 'progress',
-               payload: { type: 'move', current: i + 1, total: sources.length, name: fileName, ...prog }
+              event: 'progress',
+              payload: { type: 'move', current: i + 1, total: sources.length, name: fileName, ...prog }
             });
           });
           mainWindow?.webContents.send('nex:event', { event: 'progress_complete', payload: { type: 'move', current: i + 1, total: sources.length, name: fileName } });
@@ -621,6 +621,22 @@ function registerIpcHandlers() {
       }
       case 'delete_file':
         return deleteRecursive(args.path);
+      case 'trash_items': {
+        // B7/B8 fix: move files to recycle bin instead of permanent deletion.
+        const { paths } = args;
+        const results = [];
+        for (let i = 0; i < paths.length; i++) {
+          const target = paths[i];
+          try {
+            await shell.trashItem(target);
+            results.push({ path: target, ok: true });
+          } catch (e) {
+            results.push({ path: target, ok: false, error: e.message || String(e) });
+          }
+          mainWindow?.webContents.send('nex:event', { event: 'progress', payload: { type: 'trash', current: i + 1, total: paths.length, name: path.basename(target) } });
+        }
+        return results;
+      }
       case 'delete_files': {
         const { paths } = args;
         for (let i = 0; i < paths.length; i++) {
@@ -691,7 +707,7 @@ function registerIpcHandlers() {
             if (fs.existsSync(p)) {
               drives.push({ letter, path: p, label: '', drive_type: 'unknown', total_space: 0, free_space: 0 });
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         return drives;
       }
@@ -773,10 +789,10 @@ function registerIpcHandlers() {
                   try {
                     const stats = await fs.promises.stat(fullPath);
                     totalSize += stats.size;
-                  } catch {}
+                  } catch { }
                 }
               }
-            } catch {}
+            } catch { }
           }
           await calculate(args.path);
           resolve({ size: totalSize, files: fileCount, folders: folderCount });

@@ -1,18 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useExplorerStore } from '../../store/explorerStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, File, Music, ExternalLink } from 'lucide-react';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { X, File, Music, ExternalLink, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { readFile } from '@tauri-apps/plugin-fs';
+
+interface DirEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+}
 
 const QuickLook: React.FC = () => {
   const { quickLookFile, setQuickLookFile } = useExplorerStore();
   const [content, setContent] = useState<string | null>(null);
   const [fileType, setFileType] = useState<'image' | 'video' | 'audio' | 'text' | 'other'>('other');
+  // B15: siblings in the same folder, for arrow-key navigation.
+  const [siblings, setSiblings] = useState<DirEntry[]>([]);
+  // B16: image load failure flag for corrupted/unsupported images.
+  const [imgError, setImgError] = useState(false);
 
+  // Reset transient UI state whenever the previewed file changes.
   useEffect(() => {
+    setImgError(false);
     if (!quickLookFile) {
       setContent(null);
+      setSiblings([]);
       return;
     }
 
@@ -39,7 +52,49 @@ const QuickLook: React.FC = () => {
     } else {
       setFileType('other');
     }
+
+    // B15: load sibling files (same directory) to enable prev/next navigation.
+    // Only files (not dirs) are navigable. Failures are non-fatal — nav just
+    // won't be available.
+    const loadSiblings = async () => {
+      try {
+        const sep = quickLookFile.lastIndexOf('\\');
+        const dir = sep >= 0 ? quickLookFile.slice(0, sep) : quickLookFile;
+        const entries = await invoke<DirEntry[]>('read_dir', { path: dir });
+        setSiblings(entries.filter((e) => !e.is_dir));
+      } catch {
+        setSiblings([]);
+      }
+    };
+    loadSiblings();
   }, [quickLookFile]);
+
+  // B15: index of the current file within siblings.
+  const currentIndex = siblings.findIndex((s) => s.path === quickLookFile);
+  const canNavigate = siblings.length > 1 && currentIndex >= 0;
+
+  const goPrev = useCallback(() => {
+    if (!canNavigate) return;
+    const prev = siblings[(currentIndex - 1 + siblings.length) % siblings.length];
+    setQuickLookFile(prev.path);
+  }, [canNavigate, currentIndex, siblings, setQuickLookFile]);
+
+  const goNext = useCallback(() => {
+    if (!canNavigate) return;
+    const next = siblings[(currentIndex + 1) % siblings.length];
+    setQuickLookFile(next.path);
+  }, [canNavigate, currentIndex, siblings, setQuickLookFile]);
+
+  // B15: keyboard arrow navigation while QuickLook is open.
+  useEffect(() => {
+    if (!quickLookFile) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [quickLookFile, goPrev, goNext]);
 
   if (!quickLookFile) return null;
 
@@ -70,6 +125,28 @@ const QuickLook: React.FC = () => {
               <h2 className="text-sm font-bold truncate max-w-md">{fileName}</h2>
             </div>
             <div className="flex items-center gap-2">
+              {/* B15: prev/next nav buttons */}
+              {canNavigate && (
+                <div className="flex items-center gap-1 mr-2">
+                  <button
+                    onClick={goPrev}
+                    className="p-2 hover:bg-bg-hover rounded-full transition-colors text-text-secondary hover:text-text-primary"
+                    title="Previous (Left Arrow)"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="text-[10px] text-text-muted font-mono px-1">
+                    {currentIndex + 1} / {siblings.length}
+                  </span>
+                  <button
+                    onClick={goNext}
+                    className="p-2 hover:bg-bg-hover rounded-full transition-colors text-text-secondary hover:text-text-primary"
+                    title="Next (Right Arrow)"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              )}
               <button className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent-hover transition-colors shadow-lg shadow-accent/20">
                 <ExternalLink size={14} />
                 Open
@@ -78,20 +155,30 @@ const QuickLook: React.FC = () => {
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-bg-primary/50">
+          <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-bg-primary/50 relative">
             {fileType === 'image' && (
-              <img 
-                src={convertFileSrc(quickLookFile)} 
-                alt={fileName} 
-                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xl" 
-              />
+              // B16: onError fallback replaces broken-image icon with a clear
+              // "couldn't be previewed" message instead of the browser default.
+              imgError ? (
+                <div className="flex flex-col items-center gap-4 text-text-muted">
+                  <AlertCircle size={64} strokeWidth={1} className="text-error/60" />
+                  <p className="text-sm font-medium">Couldn't preview this image — it may be corrupted or unsupported.</p>
+                </div>
+              ) : (
+                <img
+                  src={convertFileSrc(quickLookFile)}
+                  alt={fileName}
+                  onError={() => setImgError(true)}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xl"
+                />
+              )
             )}
             {fileType === 'video' && (
-              <video 
-                src={convertFileSrc(quickLookFile)} 
-                controls 
-                autoPlay 
-                className="max-w-full max-h-[70vh] rounded-lg shadow-xl" 
+              <video
+                src={convertFileSrc(quickLookFile)}
+                controls
+                autoPlay
+                className="max-w-full max-h-[70vh] rounded-lg shadow-xl"
               />
             )}
             {fileType === 'audio' && (
@@ -118,7 +205,7 @@ const QuickLook: React.FC = () => {
           {/* Footer */}
           <div className="px-6 py-3 border-t border-border bg-bg-tertiary/50 text-[10px] text-text-muted flex justify-between items-center">
              <span>QuickLook v1.0</span>
-             <span>Press Esc to close</span>
+             <span>Press Esc to close{canNavigate ? ' · ← → to navigate' : ''}</span>
           </div>
         </motion.div>
       </motion.div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useExplorerStore } from '../store/explorerStore';
 
@@ -20,7 +20,9 @@ export function useFileSystem() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDirectory = async (path: string, search?: string) => {
+  // B2 fix: memoize loadDirectory so the search event handler and the
+  // useEffect below always close over the current showHidden value.
+  const loadDirectory = useCallback(async (path: string, search?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +82,7 @@ export function useFileSystem() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showHidden]);
 
   useEffect(() => {
     const handleSearch = (e: any) => {
@@ -91,7 +93,9 @@ export function useFileSystem() {
     loadDirectory(currentPath);
     
     return () => window.removeEventListener('nex-search', handleSearch);
-  }, [currentPath, showHidden]);
+  // loadDirectory is in deps so the search handler is always fresh after
+  // showHidden toggles (B2 fix).
+  }, [currentPath, loadDirectory]);
 
   return { files, loading, error, refresh: () => loadDirectory(currentPath) };
 }

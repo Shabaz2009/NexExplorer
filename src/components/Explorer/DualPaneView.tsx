@@ -68,10 +68,18 @@ const Pane: React.FC<PaneProps> = ({ initialPath, isActive, onActivate }) => {
     load();
   }, [currentPath]);
 
-  const navigate = (entry: FileEntry) => {
+  const navigate = async (entry: FileEntry) => {
     if (entry.is_dir) {
       setCurrentPath(entry.path);
       setSelected(new Set());
+    } else {
+      // Open files with the OS default application
+      try {
+        const { openPath } = await import('@tauri-apps/plugin-opener');
+        await openPath(entry.path);
+      } catch (err) {
+        console.error('Failed to open file:', err);
+      }
     }
   };
 

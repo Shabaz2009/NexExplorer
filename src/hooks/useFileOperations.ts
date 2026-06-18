@@ -5,7 +5,18 @@ import { useExplorerStore } from '../store/explorerStore';
 import { useFileSystem } from './useFileSystem';
 import { toast } from 'sonner';
 
-export function useFileOperations() {
+/**
+ * File operations hook — handles copy, cut, paste, trash, and rename.
+ * 
+ * `handleRename` no longer calls window.prompt() (which freezes the Tauri
+ * webview). Instead it calls `onRequestRename(oldPath, oldName)` so the
+ * parent component can open a non-blocking InputDialog.
+ */
+interface UseFileOperationsOptions {
+  onRequestRename?: (oldPath: string, oldName: string) => void;
+}
+
+export function useFileOperations(options: UseFileOperationsOptions = {}) {
   const { selectedPaths, clearSelection } = useSelectionStore();
   const { setClipboard, paths: clipboardPaths, operation: clipboardOp, clearClipboard } = useClipboardStore();
   const { currentPath } = useExplorerStore();
@@ -45,6 +56,17 @@ export function useFileOperations() {
   const handleTrash = async () => {
     if (selectedPaths.size === 0) return;
     
+    // Respect the user's confirmDelete preference from Settings
+    const { confirmDelete } = (await import('../store/settingsStore')).useSettingsStore.getState();
+    if (confirmDelete) {
+      const { ask } = await import('@tauri-apps/plugin-dialog');
+      const confirmed = await ask(
+        `Move ${selectedPaths.size} item(s) to the Recycle Bin?`,
+        { title: 'Confirm Delete', kind: 'warning' }
+      );
+      if (!confirmed) return;
+    }
+
     try {
       await invoke('trash_items', { paths: Array.from(selectedPaths) });
       toast.success(`Moved ${selectedPaths.size} items to Recycle Bin`);
@@ -56,21 +78,26 @@ export function useFileOperations() {
     }
   };
 
-  const handleRename = async () => {
+  const handleRename = () => {
     if (selectedPaths.size !== 1) return;
-    // For now we will just use a prompt, later a rename input in the grid
     const oldPath = Array.from(selectedPaths)[0];
     const oldName = oldPath.split('\\').pop() || '';
-    const newName = prompt('Enter new name:', oldName);
-    
-    if (newName && newName !== oldName) {
-      try {
-        await invoke('rename_file', { path: oldPath, new_name: newName });
-        refresh();
-        clearSelection();
-      } catch (err) {
-        toast.error(`Rename failed: ${err}`);
-      }
+
+    if (options.onRequestRename) {
+      // Non-blocking: parent opens InputDialog
+      options.onRequestRename(oldPath, oldName);
+    }
+  };
+
+  /** Called by InputDialog after the user confirms a new name. */
+  const executeRename = async (oldPath: string, newName: string) => {
+    try {
+      await invoke('rename_file', { path: oldPath, new_name: newName });
+      refresh();
+      clearSelection();
+      toast.success(`Renamed to "${newName}"`);
+    } catch (err) {
+      toast.error(`Rename failed: ${err}`);
     }
   };
 
@@ -80,6 +107,8 @@ export function useFileOperations() {
     handlePaste,
     handleTrash,
     handleRename,
+    executeRename,
     canPaste: clipboardPaths.length > 0
   };
 }
+

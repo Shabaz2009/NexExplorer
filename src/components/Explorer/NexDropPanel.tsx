@@ -6,6 +6,7 @@ import { Wifi, Send, Smartphone, Monitor, Laptop, Tablet, RefreshCw, Shield, Glo
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import ServerPanel from '../LocalShare/ServerPanel';
+import InputDialog from '../Dialogs/InputDialog';
 import { useNexDropStore, TrustedDevice } from '../../store/nexDropStore';
 import { useExplorerStore } from '../../store/explorerStore';
 
@@ -61,6 +62,7 @@ const NexDropPanel: React.FC = () => {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [showQR, setShowQR] = useState(false);
   const [defaultUsbPath, setDefaultUsbPath] = useState<string>('');
+  const [showIpDialog, setShowIpDialog] = useState(false);
 
   const { trustedDevices, addTrustedDevice, queuedPaths, clearQueuedPaths, removeQueuedPath } = useNexDropStore();
   const { navigateTo } = useExplorerStore();
@@ -69,7 +71,9 @@ const NexDropPanel: React.FC = () => {
     // Load default path and start file receiver
     const loadAndStartReceiver = async () => {
       try {
-        const path = await downloadDir();
+        // Prefer the user's configured save directory from Settings
+        const { nexDropSaveDirectory } = (await import('../../store/settingsStore')).useSettingsStore.getState();
+        const path = nexDropSaveDirectory || await downloadDir();
         setDefaultUsbPath(path);
         // Call backend server start command to fix the inactive receiver bug
         await invoke('start_nexdrop_receiver', { saveDir: path });
@@ -235,10 +239,13 @@ const NexDropPanel: React.FC = () => {
   };
 
   const browseDevice = (device: Device | TrustedDevice) => {
-    navigateTo(`http://${device.ip}:8080`);
+    // Use the device's actual port instead of a hardcoded value
+    const port = device.port || 8080;
+    navigateTo(`http://${device.ip}:${port}`);
   };
 
   return (
+    <>
     <div className="w-full h-full flex flex-col items-center justify-start p-10 overflow-y-auto custom-scrollbar bg-bg-primary/50">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -355,12 +362,7 @@ const NexDropPanel: React.FC = () => {
                     </h3>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {
-                          const ip = prompt('Enter manual IP:');
-                          if (ip) {
-                            sendToDevice({ ip, port: 53317, alias: 'Manual Device', fingerprint: '', version: '2.1', https: false, device_type: 'desktop', device_model: '', download: true });
-                          }
-                        }}
+                        onClick={() => setShowIpDialog(true)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-bg-tertiary hover:bg-bg-hover text-text-primary border border-border/50 interactive transition-all"
                       >
                         <Globe size={12} />
@@ -632,6 +634,19 @@ const NexDropPanel: React.FC = () => {
         </AnimatePresence>
       </motion.div>
     </div>
+
+    {/* Manual IP Input Dialog — replaces blocking prompt() */}
+    <InputDialog
+      isOpen={showIpDialog}
+      title="Enter Device IP Address"
+      placeholder="192.168.1.100"
+      onConfirm={(ip) => {
+        setShowIpDialog(false);
+        sendToDevice({ ip, port: 53317, alias: 'Manual Device', fingerprint: '', version: '2.1', https: false, device_type: 'desktop', device_model: '', download: true });
+      }}
+      onCancel={() => setShowIpDialog(false)}
+    />
+    </>
   );
 };
 

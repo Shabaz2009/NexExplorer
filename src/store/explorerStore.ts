@@ -72,8 +72,20 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   navigateTo: (path) => {
     const state = get();
+    // Don't push duplicate consecutive entries
+    if (state.history[state.historyIndex] === path) {
+      set({ currentPath: path });
+      return;
+    }
+    // Truncate forward history when navigating to a new path
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push(path);
+    // Cap history at 100 entries to prevent unbounded memory growth
+    const MAX_HISTORY = 100;
+    if (newHistory.length > MAX_HISTORY) {
+      const overflow = newHistory.length - MAX_HISTORY;
+      newHistory.splice(0, overflow);
+    }
     set({ 
       currentPath: path, 
       history: newHistory, 
